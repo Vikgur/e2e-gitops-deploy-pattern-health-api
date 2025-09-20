@@ -20,7 +20,7 @@
 
 # О проекте
 
-Репозиторий демонстрирует **продвинутую CI/CD-инфраструктуру** для веб-приложения [`health-api`](https://gitlab.com/vikgur/health-api-for-microservice-stack) на базе **GitHub Actions**.  
+Репозиторий демонстрирует **продвинутую CI/CD-инфраструктуру** для веб-приложения [`health-api`](https://github.com/vikgur/health-api-for-microservice-stack) на базе **GitHub Actions**.  
 
 Реализован единый пайплайн, охватывающий весь жизненный цикл доставки образов для раскатки релизов:
 
@@ -77,7 +77,7 @@
 
 ## Осознанные упрощения
 
-- Тяжёлые IaC-практики (OPA/Conftest, Checkov, полноценные policy-as-code) не дублируются и вынесены в профильные репозитории [`Terraform`](https://gitlab.com/vikgur/terraform-yandex-cloud-health-api) / [`Ansible`](https://gitlab.com/vikgur/ansible-gitops-bootstrap-health-api) / [`Helm`](https://gitlab.com/vikgur/helm-blue-green-canary-gitops-health-api).  
+- Тяжёлые IaC-практики (OPA/Conftest, Checkov, полноценные policy-as-code) не дублируются и вынесены в профильные репозитории [`Terraform`](https://github.com/vikgur/terraform-yandex-cloud-health-api) / [`Ansible`](https://github.com/vikgur/ansible-gitops-bootstrap-health-api) / [`Helm`](https://github.com/vikgur/helm-blue-green-canary-gitops-health-api).  
 - Staging — облегчённое окружение для прогонов в CI e2e-тестов.  
 
 ## Успешный прогон
@@ -116,7 +116,7 @@
 
 При пуше git-тега (например `v1.0.0`) в основной репозиторий:  
 1. CI собирает и подписывает образы (`backend`, `frontend`) с тегом `v1.0.0`.  
-2. CI автоматически открывает Pull Request в [`gitops-apps-health-api`](https://gitlab.com/vikgur/gitops-apps-health-api).  
+2. CI автоматически открывает Pull Request в [`gitops-apps-health-api`](https://github.com/vikgur/gitops-apps-health-api).  
    * Под капотом это обычный `git clone` → правка только нужных файлов (`values/*.yaml` и `apps/prod/health-api.yaml`) → новый коммит → PR.  
    * Остальные файлы в `gitops-apps-health-api` остаются без изменений.  
 3. В PR:  
