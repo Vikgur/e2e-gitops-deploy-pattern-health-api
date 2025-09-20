@@ -1,0 +1,14 @@
+# Секреты
+.env
+.vault_pass.txt
+
+# Ansible / CI retry-файлы
+*.retry
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

@@ -1,0 +1,3 @@
+# Игнорировать ложные срабатывания
+AVD-K8S-0001   # example: Deployment не имеет securityContext, но задается в другом слое
+AVD-K8S-0002

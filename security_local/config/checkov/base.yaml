@@ -1,0 +1,53 @@
+framework:
+  - terraform
+  - kubernetes
+
+# Общие настройки
+quiet: true
+compact: true
+soft_fail: false
+download_external_modules: true
+evaluate_variables: true
+var_file:
+  - terraform/terraform.tfvars
+
+# Фильтр по важности
+severity: MEDIUM
+
+# Глобальные исключения путей
+skip_path:
+  - .git
+  - .terraform
+  - node_modules
+  - dist
+  - build
+  - artifacts
+  - screenshots
+  - charts/bitnami_charts
+  - helm/values/values-dev
+
+# Профиль для Terraform
+terraform:
+  compact: true
+  # skip_checks:
+  #   - id: CKV_GCP_41
+  #     comment: "Не применимо: провайдер GCP не используется"
+  #   - id: CKV2_AWS_6
+  #     comment: "Ложноположительное в тестовом модуле — см. issue #123"
+
+# Профиль для Kubernetes
+kubernetes:
+  hard_fail_on:
+    - HIGH
+    - CRITICAL
+  # skip_checks:
+  #   - id: CKV_K8S_21
+  #     comment: "HostPath используется только в локальном Minikube стенде"
+
+# Форматы отчётов
+output:
+  - cli
+
+# Внешние правила (опционально)
+# external_checks_dir:
+#   - security/checkov_custom

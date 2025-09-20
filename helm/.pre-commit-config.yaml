@@ -1,0 +1,50 @@
+repos:
+  # YAML lint (общая проверка синтаксиса и стиля)
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        files: \.(yaml|yml)$
+
+  # Gitleaks — поиск секретов
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.18.2
+    hooks:
+      - id: gitleaks
+        args: ["detect", "--no-banner", "--verbose"]
+
+  # Trivy config — поиск misconfigurations
+  - repo: local
+    hooks:
+      - id: trivy-config
+        name: trivy config
+        entry: trivy config helm/
+        language: system
+        pass_filenames: false
+
+  # Checkov — статический анализ Kubernetes манифестов
+  - repo: local
+    hooks:
+      - id: checkov
+        name: checkov
+        entry: checkov -d helm/
+        language: system
+        pass_filenames: false
+
+  # Helm lint — проверка чартов
+  - repo: local
+    hooks:
+      - id: helm-lint
+        name: helm lint
+        entry: helm lint ./backend ./frontend ./nginx
+        language: system
+        pass_filenames: false
+
+  # Conftest (OPA) — проверка политик
+  - repo: local
+    hooks:
+      - id: conftest
+        name: conftest
+        entry: conftest test -p policy/helm helm/
+        language: system
+        pass_filenames: false

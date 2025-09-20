@@ -1,0 +1,72 @@
+# Сканы: уязвимости, секреты, мисконфиги (Terraform/K8s/YAML/Dockerfile)
+
+format: table
+severity:
+  - HIGH
+  - CRITICAL
+ignore-unfixed: true
+exit-code: 1
+timeout: 5m
+
+# Какие сканеры включать по умолчанию
+scanners:
+  - vuln
+  - secret
+  - misconfig
+
+# Настройки сканера уязвимостей
+vulnerability:
+  type:
+    - os
+    - library
+
+# Настройки поиска секретов
+secret:
+  # Можно добавить свои регулярки через .trivyignore, оставим дефолт
+  required: true
+
+# Настройки мисконфигов IaC/K8s/Dockerfile
+misconfiguration:
+  include-non-failures: false
+  # Исключения каталогов с артефактами и внешними исходниками
+  skip-dirs:
+    - .git
+    - .terraform
+    - node_modules
+    - dist
+    - build
+    - artifacts
+    - screenshots
+    - charts/bitnami_charts
+    - helm/values/values-dev
+    - __pycache__
+    - .venv
+  # Пример точечных исключений файлов (добавляйте по мере необходимости)
+  skip-files: []
+  # Можно пиновать версию Kubernetes проверок при желании
+  kubernetes:
+    # examples: exclude проверки по ID, если нужно
+    exclude: []
+  terraform:
+    exclude: []
+
+# Настройки для сканирования образов
+image:
+  # Падать на HIGH/CRITICAL
+  severity:
+    - HIGH
+    - CRITICAL
+  ignore-unfixed: true
+
+# Кэш (ускорение повторных сканов)
+cache:
+  dir: .trivycache
+
+# Общие исключения по путям (дополняет skip-dirs)
+# Работает для fs/misconfig/secret
+ignorePaths:
+  - .git
+  - .trivycache
+
+# Поддержка .trivyignore (паттерны/ID для игнора)
+ignore-policy: .trivyignore

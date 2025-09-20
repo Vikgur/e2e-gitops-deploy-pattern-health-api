@@ -1,0 +1,14 @@
+replicaCount: 2
+
+rollout:
+  strategy: canary
+  steps:
+    - setWeight: 20
+    - pause: {duration: 120}
+    - setWeight: 50
+    - pause: {duration: 120}
+    - setWeight: 100
+
+image:
+  repository: ghcr.io/vik-devops-lab/health-api-frontend
+  tag: v1.0.16
