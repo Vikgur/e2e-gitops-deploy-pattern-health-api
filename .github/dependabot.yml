@@ -1,0 +1,29 @@
+version: 2
+
+updates:
+  - package-ecosystem: "pip"
+    directory: "/app/backend"
+
+    schedule:
+      interval: "weekly"
+
+    target-branch: "main"
+
+    open-pull-requests-limit: 5
+
+    labels:
+      - "dependencies"
+      - "security"
+
+    reviewers:
+      - "your-github-username"
+
+    commit-message:
+      prefix: "deps"
+
+    rebase-strategy: "auto"
+
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"

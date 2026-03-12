@@ -1,0 +1,39 @@
+name: deploy-infra-ansible
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          pip install ansible
+
+      - name: Dry Run
+        run: |
+          ansible-playbook playbooks/site.yml --check
+
+  apply:
+    needs: dry-run
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Ansible
+        run: |
+          pip install ansible
+
+      - name: Apply configuration
+        run: |
+          ansible-playbook playbooks/site.yml

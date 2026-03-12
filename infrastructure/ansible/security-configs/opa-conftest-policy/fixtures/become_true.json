@@ -1,0 +1,9 @@
+{
+  "tasks": [
+    {
+      "name": "restart service",
+      "action": "service",
+      "become": true
+    }
+  ]
+}

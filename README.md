@@ -1,529 +1,2088 @@
 # Оглавление
 
-- [О проекте](#о-проекте)  
-  - [Монорепо](#монорепо)
-  - [Стек](#стек)  
-  - [GitOps](#gitops)  
-    - [Инфраструктура](#инфраструктура)  
-    - [CI/CD](#cicd)  
-    - [Безопасность / DevSecOps](#безопасность--devsecops)  
-    - [Веб-приложение](#веб-приложение)  
-    - [Observability](#observability)  
-  - [Все связанные репозитории](#все-связанные-репозитории)  
-- [Связь репозиториев в продакшене](#связь-репозиториев-в-продакшене)  
-  - [Цепочка взаимосвязи](#цепочка-взаимосвязи)  
-  - [CI/CD](#cicd-1)  
-    - [Текущий проект](#текущий-проект)  
-    - [Сценарий релизов (Stage → Prod)](#сценарий-релизов-stage--prod)
-    - [Продакшен](#продакшен)  
-  - [Организация репозиториев в продакшене](#организация-репозиториев-в-продакшене)  
-  - [GitOps-поток изменений](#gitops-поток-изменений)  
-  - [Управление релизами (Argo Rollouts)](#управление-релизами-argo-rollouts)  
-    - [Деплой через PR](#деплой-через-pr)  
-    - [Стратегии раскатки](#стратегии-раскатки)  
-    - [Управление раскаткой](#управление-раскаткой)  
-  - [Rollback](#rollback)  
-- [Архитектура](#архитектура)  
-  - [MVP в проде](#mvp-в-проде)  
-    - [Под капотом](#под-капотом)  
-    - [Yandex Cloud структура](#yandex-cloud-структура)  
-  - [Локальная архитектура](#локальная-архитектура)  
-    - [infra_compose/: Расширенная версия в Docker Compose](#infra_compose-расширенная-версия-в-docker-compose)  
-    - [MVP-версия в Minikube](#mvp-версия-в-minikube)  
-  - [backend/: Backend-сервис](#backend-backend-сервис)  
-  - [frontend/: Frontend-сервис](#frontend-frontend-сервис)  
-  - [e2e_tests/: End-to-End тесты](#e2e_tests-end-to-end-тесты)  
-  - [Makefile](#makefile)  
-  - [.github/: CI/CD структура](#github-cicd-структура)  
-    - [Успешный прогон](#успешный-прогон)  
-    - [Артефакты](#артефакты)  
-  - [ansible/: Ansible-автоматизация](#ansible-ansible-автоматизация)  
-  - [helm/: Структура для Dev и Prod](#helm-структура-для-dev-и-prod)  
-  - [terraform/: Terraform/Terragrunt-инфраструктура](#terraform-terraformterragrunt-инфраструктура)  
-  - [Bash-скрипты](#bash-скрипты)  
-- [DevSecOps/Безопасность](#devsecopsбезопасность)  
-  - [security_local/config](#security_localconfig)  
-  - [security_local/policy](#security_localpolicy)  
-  - [.pre-commit-config.yaml](#pre-commit-configyaml)  
+- [Цель и масштаб проекта](#цель-и-масштаб-проекта)
+- [Архитектура платформы и стек](#архитектура-платформы-и-стек)
+- [DevSecOps в SDLC](#devsecops-в-sdlc)
+  - [CI/CD архитектура](#cicd-архитектура)
+  - [Контроль качества кода](#контроль-качества-кода)
+  - [Security-проверки в CI](#security-проверки-в-ci)
+    - [Секреты / Утечки (Gitleaks)](#секреты--утечки-gitleaks)
+    - [SAST (SonarQube, Semgrep)](#sast-sonarqube-semgrep)
+    - [SCA зависимостей кода (OWASP Dependency-Check)](#sca-зависимостей-кода-owasp-dependency-check)
+    - [Файловая безопасность (Trivy FS)](#файловая-безопасность-trivy-fs)
+    - [Container security (Hadolint)](#container-security-hadolint)
+    - [IaC security (Checkov)](#iac-security-checkov)
+    - [Kubernetes манифесты (Polaris, Kubeconform)](#kubernetes-манифесты-polaris-kubeconform)
+    - [Policy-as-Code (Open Policy Agent / Conftest)](#policy-as-code-open-policy-agent--conftest)
+    - [DAST (OWASP ZAP)](#dast-owasp-zap)
+    - [Fuzzing (ffuf)](#fuzzing-ffuf)
+- [Software и Supply Chain Security](#software-и-supply-chain-security)
+  - [Мониторинг зависимостей (Dependabot)](#мониторинг-зависимостей-dependabot)
+  - [SBOM генерация и анализ (Syft, Grype)](#sbom-генерация-и-анализ-syft-grype)
+  - [Проверка лицензий (ScanCode Toolkit)](#проверка-лицензий-scancode-toolkit)
+  - [SCA образов (Trivy Image)](#sca-образов-trivy-image)
+  - [Подпись и контроль артефактов (Cosign)](#подпись-и-контроль-артефактов-cosign)
+  - [Закрытые артефактории (GHCR, Harbor, Nexus)](#закрытые-артефактории-ghcr-harbor-nexus)
+- [Platform Security](#platform-security)
+  - [Identity и Secrets](#identity-и-secrets)
+    - [Secrets, PKI (HashiCorp Vault)](#secrets-pki-hashicorp-vault)
+    - [IaM, OIDC/OAuth2 (Keycloak)](#iam-oidcoauth2-keycloak)
+  - [Kubernetes Security](#kubernetes-security)
+    - [Cluster security (RBAC, NetworkPolicies, SecurityContext)](#cluster-security-rbac-networkpolicies-securitycontext)
+    - [Admission controller (Kyverno)](#admission-controller-kyverno)
+    - [Runtime security (Falco, Trivy)](#runtime-security-falco-trivy)
+    - [East-West mTLS (Istio)](#east-west-mtls-istio)
+    - [CIS Benchmark (kube-bench)](#cis-benchmark-kube-bench)
+- [Управление уязвимостями и ASOC](#управление-уязвимостями-и-asoc)
+  - [ASOC (DefectDojo)](#asoc-defectdojo)
+  - [AppSec процессы](#appsec-процессы)
+    - [Триаж](#триаж)
+    - [Обработка False positive](#обработка-false-positive)
+    - [Принятие рисков](#принятие-рисков)
+- [Моделирование угроз](#моделирование-угроз)
+  - [Методология (STRIDE)](#методология-stride)
+  - [Домены риска](#домены-риска)
+  - [OWASP Top-10:2025 маппинг](#owasp-top-102025-маппинг)
+  - [CWE Top-25 маппинг](#cwe-top-25-маппинг)
+- [Регуляторные требования и стандарты](#регуляторные-требования-и-стандарты)
+  - [Российские регуляторы](#российские-регуляторы)
+    - [ФСТЭК](#фстэк)
+    - [ФЗ-187](#фз187)
+    - [ФЗ-152](#фз152)
+    - [ФСБ](#фсб)
+  - [Российские стандарты](#российские-стандарты)
+    - [ГОСТ Р 56939-2024](#гост-р-56939-2024)
+    - [ГОСТ Р 56938-2016](#гост-р-56938-2016)
+    - [ГОСТ Р 58833-2020](#гост-р-58833-2020)
+    - [ГОСТ Р 594531-2021](#гост-р-594531-2021)
+    - [ГОСТ Р 594532-2021](#гост-р-594532-2021)
+    - [ГОСТ Р 59547-2021](#гост-р-59547-2021)
+  - [Международные стандарты](#международные-стандарты)
+    - [ISO/IEC 27001:2022](#isoiec-270012022)
+    - [ISO/IEC 27002:2022](#isoiec-270022022)
+    - [ISO/IEC 27005:2022](#isoiec-270052022)
+  - [Международные фреймворки](#международные-фреймворки)
+    - [OWASP SAMM / BSIMM](#owasp-samm--bsimm)
+    - [NIST SSDF / CSF](#nist-ssdf--csf)
 
 ---
 
-# О проекте  
+# Цель и масштаб проекта
 
-Данный репозиторий — **монорепо-портфолио**, демонстрация **end-to-end DevOps/DevSecOps/GitOps-архитектуры** для веб-приложения [`health-api`](https://github.com/vikgur/health-api-for-microservice-stack).  
+## Назначение 
 
-- **Цепочка поставки в облако:**  
-  - Развернута безопасная цепочка поставки с DevSecOps-практиками.  
-  - Настроено отдельное stage-окружение, полностью изолированное и идентичное prod (на отдельных ВМ в одном облачном аккаунте).  
+Демонстрация production-grade DevSecOps платформы с полной интеграцией AppSec-практик в жизненный цикл разработки.
 
-- **Локальная отладка:**  
-  - [**Расширенная версия**](#infra_compose-расширенная-версия-в-docker-compose) в `docker-compose` (18 контейнеров: backend, frontend, Kafka/Zookeeper, PostgreSQL + PgBouncer, observability, экспортёры) поднимается одной командой через [Makefile](#makefile).  
-  - [**MVP-версия**](#mvp-версия-в-minikube) в `Minikube`.  
+Проект моделирует реальную корпоративную среду, в которой безопасность встроена во все этапы доставки программного обеспечения — от разработки до эксплуатации.
 
-Весь путь — от создания облака до dev/stage/prod-развёртывания, отладки и управления приложением — **сведён к серии коротких команд в рамках GitOps-потока**.  
+Архитектура ориентирована на аудит безопасности и демонстрацию зрелости DevSecOps-процессов.
 
-Встраивание **продвинутых end-to-end DevSecOps-практик**, охватывающих безопасность всего проекта "под ключ", вынесено в отдельный репозиторий [devsecops-gitops-health-api](https://github.com/Vikgur/devsecops-gitops-health-api). В текущем репозитории — базовые настройки.
+## Класс решаемых задач
 
-## Монорепо
+- построение **Secure SDLC**
+- автоматизация **security-контролей в CI/CD**
+- контроль **software supply chain**
+- защита **cloud-native инфраструктуры**
+- централизованное управление **уязвимостями**
 
-- **Авторский стенд** продовой микросервисной архитектуры.  
-- Полностью рабочий и поднимаемый end-to-end.  
-- Все ключевые компоненты собраны в одном месте, папки содержат копии исходных репозиториев с их README.  
-- В реальном продакшене используется раздельная структура [GitOps-репозиториев](#все-связанные-репозитории) под управлением Argo CD; здесь — адаптация в формате единого монорепо.  
-- Зафиксирован **паттерн GitOps-деплоя**: от IaC и CI/CD до продакшен-развёртывания.  
-- Реализована стратегия [**blue-green + canary**](#стратегии-раскатки) для безопасных раскаток и быстрого rollback.  
----
+## Демонстрируемые DevSecOps-подходы
 
-## Стек  
+- security-by-design архитектура  
+- shift-left безопасность  
+- shift-right безопасность  
+- security-gates в CI/CD  
+- policy-as-code  
+- software supply chain security  
+- continuous vulnerability management  
 
-Проект охватывает **полный технологический спектр**, используемый в продакшен-инфраструктуре через GitOps автоматизацию: от IaC и CI/CD до мониторинга и DevSecOps. Ниже перечислены все технологии, сгруппированные по уровням с указанием их роли.  
+## Покрытие
 
-## GitOps  
+Проект демонстрирует полный цикл DevSecOps-практик:
 
-- **Argo CD** (Rollouts, Image Updater, Ingress, Cert-manager, External Secrets, Monitoring, Policies)  
-
-### Инфраструктура 
-
-Управление инфраструктурой и контейнерами:  
-- **IaC:** Terraform, Terragrunt, Ansible, Bash, Make  
-- **Kubernetes:** K3s, K8s (Minikube), Helm, Helmfile
-- **Containerization:** Docker  
-
-### CI/CD  
-
-Автоматизация сборки, тестирования и доставки:  
-- **Pipeline:** GitHub Actions  
-- **Code style & linting:** Black, Isort, Flake8  
-- **Unit & integration tests:** Python/Pytest  
-
-### Безопасность / DevSecOps  
-
-Защита цепочки поставки, анализ кода и проверка инфраструктуры.  
-
-**CI:**  
-- **Supply chain:** Cosign (подпись и верификация образов)  
-- **Secrets & leaks:** Gitleaks  
-- **Static analysis (SAST):** Semgrep  
-- **Vulnerability scanning (SCA):** Trivy FS, Trivy Image  
-- **Policy & compliance:** Polaris, Helmfile lint, Yamllint, Shellcheck, Dotenv-linter, Kubeconform  
-
-**CD:**  
-- Проверка `.env`, `docker-compose config`  
-- Деплой только trusted-образов из GHCR (подписанных Cosign)  
-- Автораскатка stage окружения (клон прода)
-- Ручное подтверждение на prod через PR-gate  
-
-**Локально:**  
-- **Policy-as-Code:** OPA/Conftest (Terraform, Kubernetes)  
-- **Infrastructure scanning:** Checkov, TFLint  
-- **Unit-тесты политик:** rego security_test.rego (Kubernetes)  
-
-### Веб-приложение  
-
-Сервисы и компоненты приложения:  
-- **Backend:** Python (Flask), Pytest  
-- **Frontend:** React, Vite  
-- **Тестирование:** Python/Pytest, Allure  
-- **Документация:** Swagger UI  
-- **Брокеры:** Kafka, Zookeeper, Redpanda Console  
-- **БД:** PostgreSQL, PgBouncer  
-
-### Observability  
-
-Контроль, метрики и трассировка:  
-- **Monitoring & metrics:** Prometheus, VictoriaMetrics, Alertmanager  
-- **Visualization:** Grafana  
-- **Tracing:** Jaeger  
-- **Экспортёры:** Postgres-exporter, Pgbouncer-exporter, Kafka-exporter  
+- **Secure SDLC** — контроль безопасности на всех этапах разработки  
+- **DevSecOps platform** — централизованная платформа security-контролей  
+- **Cloud-native security** — защита Kubernetes-среды  
+- **Production-grade архитектура** — инфраструктура и процессы уровня enterprise
 
 ---
 
-## Все связанные репозитории 
+# Архитектура платформы и стек
 
-**Infrastructure / DevOps**  
-- [terraform-terragrunt-yandex-cloud-health-api](https://github.com/Vikgur/terraform-terragrunt-yandex-cloud-health-api) — создание облачных ресурсов (VPC, VM, k8s-кластер) в Yandex Cloud для Prod и Stage.  
-- [ansible-gitops-bootstrap-health-api](https://github.com/vikgur/ansible-gitops-bootstrap-health-api) → установка Argo CD с гибким доступом (SSO через OIDC/Dex или admin с bcrypt).  
-- [argocd-config-health-api](https://github.com/vikgur/argocd-config-health-api) → системный конфиг Argo CD (ConfigMap, Repos, Projects, RBAC, Notifications).  
-- [gitops-argocd-platform-health-api](https://github.com/vikgur/gitops-argocd-platform-health-api) → базовые платформенные сервисы (argo-rollouts, argocd-image-updater, ingress-nginx, cert-manager, external-secrets, monitoring, policy-engine).  
-- [helm-blue-green-canary-gitops-health-api](https://github.com/vikgur/helm-blue-green-canary-gitops-health-api) → «боевые» чарты и values для dev/stage/prod; стратегии деплоя через Argo Rollouts (Blue/Green, Canary).  
-- [gitops-apps-health-api](https://github.com/vikgur/gitops-apps-health-api) → конкретные приложения (stage/prod); Application для деплоя backend, frontend и nginx из helm-blue-green-canary-gitops-health-api.  
-- [ci-gitops-health-api](https://github.com/vikgur/ci-gitops-health-api) → CI/CD пайплайны: сборка, сканирование и подписание контейнеров, обновление тегов в `gitops-apps-health-api`.  
-- [bash-scripts-gitops-health-api](https://github.com/Vikgur/bash-scripts-gitops-health-api) — bash-скрипты для деплоя и автоматизации  
-- [k8s-local-minikube-health-api](https://github.com/Vikgur/k8s-local-minikube-health-api) — локальный запуск MVP в Minikube  
-- [infra-docker-compose-health-api](https://github.com/Vikgur/prod-ready-dockerized-microservice-stack) — локальная инфраструктура (18 контейнеров)  
+Проект построен как production-подобная платформа, включающая прикладной слой, инфраструктуру доставки, систему наблюдаемости и инструменты безопасности.
 
-**Приложение**  
-- [backend-health-api](https://github.com/Vikgur/health-api-for-microservice-stack) — Flask backend  
-- [frontend-health-api-ui](https://github.com/Vikgur/health-api-ui-for-microservice-stack) — React/Vite frontend  
+## Application слой
 
-**Е2Е-тесты**  
-- [e2e-tests-health-api](https://github.com/Vikgur/e2e-tests-health-api-for-microservice-stack) — E2E тесты (Pytest + Allure)  
+Демонстрационное приложение используется как объект для тестирования DevSecOps-процессов.
 
-## Связь репозиториев в продакшене
+- **Python Flask backend**  
+- **React frontend**  
+- **Pytest test suite**
 
-В реальном продакшене проект разделён на независимые GitOps-репозитории, объединённые через **Argo CD**.
+Приложение содержит API-эндпоинты, интеграции с БД и брокером сообщений, что позволяет проверять различные классы security-сканирования.
 
-### Цепочка взаимосвязи
+## Platform слой
 
-**Terraform → Ansible Bootstrap → Argo CD Config → Argo CD Platform → Helm → Argo CD Apps → CI/E2E-тесты → CD → Stage/Prod**.  
+Контейнерная и оркестрационная платформа доставки.
 
-Порядок действий и взаимодействие репозиториев:
+- **Docker** — контейнеризация приложений  
+- **Kubernetes (k3s)** — оркестрация кластера  
+- **Helm / Helmfile** — управление релизами  
+- **GitOps delivery** — Argo CD (App-of-Apps модель)
 
-1. **Подготовка Git-репозиториев**  
-   - Локально редактируются и пушатся все конфиги:  
-     - [`argocd-config-health-api`](https://github.com/vikgur/argocd-config-health-api)  
-     - [`gitops-argocd-platform-health-api`](https://github.com/vikgur/gitops-argocd-platform-health-api)  
-     - [`helm-blue-green-canary-gitops-health-api`](https://github.com/vikgur/helm-blue-green-canary-gitops-health-api)  
-     - [`gitops-apps-health-api`](https://github.com/vikgur/gitops-apps-health-api)  
-   - Репозитории должны быть в Git **до установки Argo CD**, чтобы он смог их подтянуть.  
+Все изменения инфраструктуры и приложений проходят через GitOps-процессы.
 
-2. **Создание окружений (stage/prod)**  
-   - Из [`terraform-terragrunt-yandex-cloud-health-api`](https://github.com/Vikgur/terraform-terragrunt-yandex-cloud-health-api):  
-     создаются сети, ВМ, k3s-кластера в Yandex Cloud.  
+## Infrastructure as Code
 
-3. **Bootstrap (Ansible)**  
-   - Из [`ansible-gitops-bootstrap-health-api`](https://github.com/vikgur/ansible-gitops-bootstrap-health-api):  
-     установка всех необходимых компонентов, включая Argo CD.  
-   - Применяется минимальный bootstrap-`Application`, который указывает на репозиторий [`argocd-config-health-api`](https://github.com/vikgur/argocd-config-health-api).  
+Инфраструктура полностью управляется через код.
 
-4. **Системный конфиг Argo CD**  
-   - Argo CD подтягивает манифесты из [`argocd-config-health-api`](https://github.com/vikgur/argocd-config-health-api):  
-     Repos, Projects, RBAC, Notifications.  
+- **Terraform** — provisioning инфраструктуры  
+- **Terragrunt** — управление Terraform-модулями  
+- **Ansible** — конфигурация серверов и bootstrap кластера
 
-5. **Платформа (App-of-Apps)**  
-   - Argo CD синхронизирует [`gitops-argocd-platform-health-api`](https://github.com/vikgur/gitops-argocd-platform-health-api):  
-     image-updater, ingress-nginx, cert-manager, external-secrets, rollouts, monitoring, policies.  
+Это позволяет воспроизводимо разворачивать окружения и проводить security-аудит инфраструктуры.
 
-6. **Чарты и values**  
-   - Источник в [`helm-blue-green-canary-gitops-health-api`](https://github.com/vikgur/helm-blue-green-canary-gitops-health-api).  
-   - Используются приложениями, руками не деплоятся.  
+## Observability
 
-7. **Приложения (stage/prod)**  
-   - Argo CD применяет [`gitops-apps-health-api`](https://github.com/vikgur/gitops-apps-health-api):  
-     backend, frontend, nginx.  
-   - Stage → auto-sync, prune, selfHeal.  
-   - Prod → только через PR-gейт.  
+Стек наблюдаемости используется как для эксплуатации, так и для security-анализа.
 
-8. **CI/CD**  
-   - Из [`ci-gitops-health-api`](https://github.com/vikgur/ci-gitops-health-api):  
-     сборка, сканирование, подписание образов.  
-   - Auto-deploy на stage через Argo Image Updater.  
-   - Prod — blue/green/canary только через PR в [`gitops-apps-health-api`](https://github.com/vikgur/gitops-apps-health-api).  
+- **Prometheus** — сбор метрик  
+- **Grafana** — визуализация  
+- **Jaeger** — distributed tracing  
+- **OpenTelemetry** — инструментирование сервисов
 
-### CI/CD  
+Наблюдаемость используется для анализа поведения приложений и диагностики инцидентов.
 
-#### Текущий проект
+## Локальная prod-like среда
 
-в текущем проекте запускается **автоматически в GitHub Actions** из [`ci-gitops-health-api`](https://github.com/vikgur/ci-gitops-health-api). В репозитории должны быть все необходимые каталоги: backend, frontend, e2e_tests, helm, infra_compose (из `ci-gitops-health-api` исключены в целях демонстрации только логики пайплайнов).
+Для разработки, тестирования запуска security-сканирований используется локальная среда, максимально приближенная к production.
 
-Реализовано:
-- Сборка, сканирование и подписание контейнеров.  
-- Push образов в Registry для E2E-тестов.  
-- E2E-тесты: только прошедшие тесты образы тегируются в Registry и раскатываются дальше.  
-- Автотегирование и автораскатка на `stage` через Argo Image Updater для приёмочных тестов.  
-- Для `prod` — ручное тегирование + Pull Request с обновлением тегов в `gitops-apps-health-api` (PR-gate).  
+Docker Compose разворачивает полноценную сервисную платформу.
 
-#### Сценарий релизов (Stage → Prod)
+**Состав среды (18 контейнеров):**
 
-1. **Релиз 1**  
-   - Выкатился на Stage и Prod → активный цвет `blue`.  
-
-2. **Релиз 2**  
-   - Автоматически обновил Stage.  
-   - На Prod раскатился как `green` рядом с `blue`.  
-   - При canary-переключении выявлен баг → откат на `blue` (`abort/undo`).  
-   - Stage остаётся на релизе 2, Prod продолжает работать на релизе 1.  
-
-3. **Релиз 3 (фикс)**  
-   - Новый тег → Stage обновился.  
-   - На Prod релиз 3 раскатывается как `green` рядом с `blue` (релиз 1).  
-   - После успешного теста `promote` → `green` становится активным.  
-   - Stage и Prod синхронизированы (оба на релизе 3).  
-
-**Принцип:** Stage всегда «на шаг впереди», Prod получает только проверенные релизы через blue-green + canary.
-
-#### Продакшен
-
-- **Монолитный пайплайн** (как в текущем проекте) — валидный боевой паттерн: линтеры, DevSecOps, сборка, сканирование, E2E → только проверенные образы уходят в Registry.  
-- **Разделение на несколько пайплайнов** (validation, build, e2e, signing) применяется в масштабных продуктивных системах: быстрее фидбэк, параллельность, строгий контроль безопасности.  
-
-В ткущем проекте показан монолит для наглядности, но знание обеих схем важно:  
-монолит = практичность, разбиение = best practice для больших платформ.  
+- backend
+- frontend
+- брокеры Kafka/Zookeeper
+- PostgreSQL + PgBouncer
+- observability (Prometheus, VictoriaMetrics, Grafana, Jaeger, Alertmanager)
+- экспортёры.
 
 ---
 
-### Организация репозиториев в продакшене 
+# DevSecOps в SDLC
 
-В реальном продакшене все репозитории находятся в одной GitHub/GitLab **организации** (например, `company-health-api`).  
-Доступы разграничиваются по ролям:  
+Безопасность встроена в жизненный цикл разработки и реализована через автоматизированные security-контроли в CI/CD.
 
-- **DevOps (полный доступ)**  
-  - все инфраструктурные репозитории (`terraform`, `ansible`, `argocd-config`, `gitops-argocd-platform`, `helm-blue-green-canary`, `gitops-apps`, `ci-gitops`)  
-  - репозитории приложений (`backend`, `frontend`)  
-  - тесты (`e2e-tests`)  
-  - утилиты (`bash-scripts`, `k8s-local-minikube`, `infra-docker-compose`)  
+Подход основан на принципах **Shift-Left / Shift-Right Security**, **Security Gates** и **Secure SDLC**.
 
-- **Backend-разработчики**  
-  - `backend-health-api`  
+Все изменения кода, инфраструктуры и конфигураций проходят через многоуровневую систему автоматических проверок.
 
-- **Frontend-разработчики**  
-  - `frontend-health-api-ui`  
 
-- **AQA (тестировщики)**  
-  - `e2e-tests-health-api`  
+## CI/CD архитектура
 
-Таким образом:  
-- DevOps имеет доступ ко всему стеку (end-to-end).  
-- Разработчики и AQA работают только в своей зоне ответственности.  
-- Контроль доступа в организации настраивается через Teams/Groups.  
+Доставка построена на GitHub Actions с разделением пайплайнов по зонам ответственности.
 
-### GitOps-поток изменений  
+### CI pipelines
 
-- **Инициализация**: в `master` фиксируются стартовые версии конфигураций  
-  ([`helm-blue-green-canary-gitops-health-api`](https://github.com/vikgur/helm-blue-green-canary-gitops-health-api),  
-  [`gitops-apps-health-api`](https://github.com/vikgur/gitops-apps-health-api),  
-  [`argocd-config-health-api`](https://github.com/vikgur/argocd-config-health-api),  
-  [`gitops-argocd-platform-health-api`](https://github.com/vikgur/gitops-argocd-platform-health-api),  
-  [`terraform-terragrunt-yandex-cloud-health-api`](https://github.com/Vikgur/terraform-terragrunt-yandex-cloud-health-api),  
-  [`ansible-gitops-bootstrap-health-api`](https://github.com/vikgur/ansible-gitops-bootstrap-health-api)).  
+Используются для проверки изменений перед merge.
 
-- **Рабочий процесс**: все изменения выполняются в отдельных ветках, затем вносятся через Pull Request → merge в `master`.  
+- **Application CI** — линтинг, сборка, unit-тесты, api тесты и security-сканирование backend/frontend  
+- **Infrastructure CI** — линтинг, security-сканирование Terraform, Ansible и Helm  
+- **Tests CI** — линтинг, security-сканирование, интеграционные и E2E-UI тесты 
 
-- **Синхронизация**: Argo CD отслеживает `master` и автоматически приводит кластер к его состоянию.  
+Каждый pipeline реализует набор контролируемых **security gates**, при необходимости блокирующих небезопасные изменения.
 
-- **Fallback**: прямые изменения в кластере допустимы только для отладки, так как вызывают дрейф и будут перезаписаны Argo CD.  
+### Deploy pipelines
 
-### Управление релизами (Argo Rollouts)
+Пайплайны доставки управляют развертыванием инфраструктуры и приложений.
 
-#### Деплой через PR
+- **Application deploy** — доставка приложений через GitOps  
+- **Terraform deploy** — управление облачной инфраструктурой  
+- **Ansible deploy** — конфигурация серверов и bootstrap окружений  
+- **Helm deploy** — управление релизами Kubernetes
 
-* Репозиторий [`gitops-apps-health-api`](https://github.com/vikgur/gitops-apps-health-api) используется как точка входа для обновления тегов образов.
-* После принятия изменений Argo CD синхронизирует конфигурацию и инициирует раскатку через Argo Rollouts.
+Развертывание производится вручную только после прохождения всех security-проверок.
 
-#### Стратегии раскатки
+### Итоговая цепочка джоб
 
-* Описываются в [`helm-blue-green-canary-gitops-health-api`](https://github.com/vikgur/helm-blue-green-canary-gitops-health-api) в `values-*.yaml`.
-* Поддерживаются Blue/Green и Canary.
-* При изменении конфигурации стратегий Argo CD автоматически подхватывает новые значения и применяет их.
+#### ci-app-backend.yml
 
-#### Управление раскаткой
+Job 1: Backend Code Quality (Flake8, Black, Isort, Mypy)  
+Job 2: API Tests Code Quality (Flake8, Black, Isort, Mypy)  
+Job 3: Unit Tests (Pytest)  
+Job 4: Secrets (Gitleaks)  
+Job 5: SAST (SonarQube, Semgrep)  
+Job 6: SCA (OWASP Dependency‑Check)  
+Job 7: SBOM кода: генерация и проверка (Syft, Grype)  
+Job 8: Repo Security (Trivy FS)  
+Job 9: Dockerfile Security (Hadolint)  
+Job 10: API Tests Security (Gitleaks, Semgrep, OWASP Dependency‑Check, Syft)  
+Job 11: Build Image  
+Job 12: API Tests & Runtime Security   
+- Развёртывание тестового окружения (docker‑compose/k8s namespace)  
+- Запуск api тестов (Pytest, `tests/api/`)  
+- OWASP ZAP baseline scan  
 
-Процесс контролируется через **Argo Rollouts** (CLI или UI):
+Job 13: URL fuzzing (FFuf)  
+Job 14: SCA (Trivy Image)  
+Job 15: SBOM образа: генерация и проверка (Syft, Grype)  
+Job 16: Лицензии (Scancode‑Toolkit)  
+Job 17: Тегирование образа (sha-tag)  
+Job 18: Подпись образа OIDC/Keyless (Cosign)  
+Job 19: Push Image (в GHCR)
 
-```bash
-kubectl argo rollouts get rollout <name>      # просмотр статуса - показывает текущее состояние раскатки (версии, трафик, шаги, ревизии)
-kubectl argo rollouts promote <name>          # промоутирование - вручную переводит раскатку на следующий шаг или завершает её досрочно
-kubectl argo rollouts abort <name>            # остановка или откат - останавливает текущую раскатку и возвращает трафик на предыдущую стабильную версию
-kubectl argo rollouts undo <name> --to-revision=<n>  # возврат к ревизии - откатывает приложение к указанной ревизии (n)
-```
+#### ci-app-frontend.yml
 
-CLI работает локально через настроенный `kubectl`, взаимодействие происходит с API Kubernetes-кластера.
+Job 1: Code Quality (ESLint, Prettier)  
+Job 2: Unit Tests (npm test)  
+Job 3: Secrets (Gitleaks)  
+Job 4: SAST (Semgrep)  
+Job 5: SCA (OWASP Dependency‑Check)  
+Job 6: SBOM кода: генерация и проверка (Syft, Grype)  
+Job 7: Repo Security (Trivy FS)  
+Job 8: Dockerfile Security (Hadolint)  
+Job 9: Build Image (npm build + Docker build)  
+Job 10: Image Security (Trivy image)  
+Job 11: SBOM образа: генерация и проверка (Syft, Grype)  
+Job 12: Лицензии (Scancode‑toolkit)  
+Job 13: Тегирование образа (sha-tag)  
+Job 14: Подпись образа OIDC/Keyless (Cosign)  
+Job 15: Push Image (в GHCR)
 
-Для управления раскатками не требуется заходить на ВМ.  
+#### ci-infra-ansible.yml
 
-- Устанавливается `kubectl` и плагин `argo-rollouts` локально.  
-- Настраивается доступ к кластеру через `kubeconfig`  
-  (например, `yc managed-kubernetes cluster get-credentials` или выгрузка с master).  
-- Все команды выполняются локально, взаимодействие идёт напрямую с API-сервером кластера.  
+Job 1: Code Quality (Yamllint, Ansible‑Lint, Shellcheck)  
+Job 2: Secrets (Gitleaks)  
+Job 3: Repo Security (Trivy FS)  
+Job 4: SAST / Misconfiguration (Semgrep)  
+Job 5: IaC Security (Checkov)  
+Job 6: Policy‑as‑Code (OPA / Conftest / Rego)  
+Job 7: SBOM кода (Syft)  
+Job 8: SBOM анализ (Grype)  
+Job 9: Лицензии (ScanCode Toolkit)
 
-### Rollback  
+#### ci-infra-helm.yml
 
-- Поддерживается встроенными возможностями Argo Rollouts через undo.  
-- Выполняется как через CLI, так и через UI Argo CD (выбор ревизии).  
-- Дополнительно поддерживаются fallback-сценарии через Helmfile и Makefile (описаны в [`helm-blue-green-canary-gitops-health-api`](https://github.com/vikgur/helm-blue-green-canary-gitops-health-api)):  
-  - Blue/Green: переключение трафика между слотами (*-blue / *-green).  
-  - Canary: остановка rollout на шаге или полный откат версии.  
-  - Helmfile-команды позволяют вручную развернуть стабильный образ или восстановить удалённый слот.  
-- Важно: при ручном rollback возникает дрейф с Git.  
-  - На stage (auto-sync + selfHeal) Argo CD автоматически вернёт кластер к состоянию из Git.  
-  - На prod (PR-gate) Argo CD покажет OutOfSync, но изменения не применит без подтверждения.  
-- Поэтому в боевом процессе rollback выполняется только через Git (изменение тегов и merge PR), а CLI/Helmfile остаются fallback-инструментами.  
+Job 1: Code Quality (Yamllint, Helm Lint, Helmfile Lint)  
+Job 2: Secrets (Gitleaks)  
+Job 3: Repo Security (Trivy FS)  
+Job 4: Kubernetes Schema Validation (Kubeconform)  
+Job 5: Kubernetes Best Practices (Polaris)  
+Job 6: IaC Security (Checkov)  
+Job 7: Policy‑as‑Code (OPA / Conftest / Rego)  
+Job 8: SBOM кода (Syft)  
+Job 9: SBOM анализ (Grype)  
+Job 10: Лицензии (ScanCode Toolkit)
+
+#### ci-infra-terraform.yml
+
+Job 1: Code Quality (Fmt, Validate, TFLint)  
+Job 2: Secrets (Gitleaks)  
+Job 3: Repo Security (Trivy FS)  
+Job 4: IaC Security (Checkov)  
+Job 5: Policy‑as‑Code (OPA / Conftest / Rego)  
+Job 6: SBOM кода (Syft)  
+Job 7: SBOM анализ (Grype)  
+Job 8: Лицензии (ScanCode Toolkit)
+
+#### ci-tests-integration.yml
+
+Job 1: Code Quality (Flake8, Black, Isort, Mypy)  
+Job 2: Secrets (Gitleaks)  
+Job 3: SAST Tests Code (Semgrep)  
+Job 4: Repo Security (Trivy FS)  
+Job 5: Pull Backend and Frontend Images  
+Job 6: Deploy and Test Stack (Integration Tests + Runtime Security)  
+- Развёртывание тестового окружения (docker‑compose/k8s namespace)  
+- Запуск интеграционных тестов (Pytest, `tests/integration/`)  
+- OWASP ZAP baseline scan  
+Job 7: URL Fuzzing (FFuf)
+
+#### ci-tests-e2e-ui.yml
+
+Job 1: Code Quality (Flake8, Black, Isort, Mypy)  
+Job 2: Secrets (Gitleaks)  
+Job 3: SAST Tests Code (Semgrep)  
+Job 4: Repo Security (Trivy FS)  
+Job 5: Pull Backend and Frontend Images  
+Job 6: Deploy and Test Stack (E2E UI + DAST)  
+- Развёртывание тестового окружения (staging)  
+- Запуск E2E UI‑тестов (Selenium, `tests/e2e-ui/`)  
+- OWASP ZAP full scan  
+
+Job 7: URL Fuzzing (FFuf)
+
+#### deploy‑app.yml
+
+Job 1: Release Approval (Manual Trigger)  
+- Ручное подтверждение запуска деплоя  
+- Требует одобрения от ответственного лица  
+
+Job 2: Verify Images (Cosign)  
+- Проверка подписей образов: `cosign verify backend-image` и `frontend-image`  
+- Валидация OIDC‑подписей  
+- Отказ при отсутствии валидной подписи  
+
+Job 3: Update GitOps Repo  
+- Обновление тегов образов в `values.yaml` (Helm)  
+- Создание PR в репозиторий `gitops-apps` с изменениями  
+- Добавление метаданных релиза (версия, коммит)  
+
+Job 4: Merge Release PR  
+- Автоматическое слияние PR после одобрения  
+- Триггер для ArgoCD  
+- Логирование изменений  
+
+Job 5: ArgoCD Sync Verification  
+- Ожидание завершения синхронизации в ArgoCD  
+- Проверка статуса всех ресурсов (Pods, Services, Ingress)  
+- Таймаут: 10 мин  
+- Отправка уведомления при успехе/ошибке
+
+#### deploy‑infra‑terraform.yml
+
+Job 1: Release Approval (Manual Trigger)  
+- Ручной запуск пайплайна  
+- Обязательное одобрение (например, через GitHub Actions approval)  
+
+Job 2: Terraform Plan  
+- `terraform init`  
+- `terraform plan -out=tfplan`  
+- Вывод изменений (что будет создано/изменено/удалено)  
+- Сохранение плана как артефакт  
+
+Job 3: Terraform Apply (Manual Approval)  
+- Запрос ручного подтверждения перед применением  
+- `terraform apply tfplan`  
+- Логирование выполненных действий  
+- Обработка ошибок (откат при сбое)  
+
+Job 4: ArgoCD / Infra Verification  
+- Проверка статуса ресурсов через `kubectl get all -A`  
+- Валидация работоспособности ключевых сервисов  
+- Опционально: запуск health‑check‑скриптов  
+- Уведомление о завершении  
+
+#### deploy‑infra‑ansible.yml
+
+Job 1: Release Approval (Manual Trigger)  
+- Ручная активация пайплайна  
+- Контроль доступа (только уполномоченные пользователи)  
+
+Job 2: Dry Run (Ansible Check)  
+- `ansible-playbook --check playbook.yml`  
+- Имитация выполнения без изменений  
+- Выявление потенциальных ошибок  
+- Сохранение вывода для анализа  
+
+Job 3: Apply Configuration  
+- `ansible-playbook playbook.yml`  
+- Последовательное применение конфигураций  
+- Роллинг‑апдейты (если требуется)  
+- Логирование всех действий  
+
+Job 4: Infra Verification  
+- Проверка состояния серверов (`uptime`, `load`)  
+- Тестирование доступности сервисов (HTTP‑чеки, порты)  
+- Сбор метрик (CPU, RAM, диск)  
+- Отчёт о статусе деплоя  
+
+#### deploy‑infra‑helm.yml
+
+Job 1: Release Approval (Manual Trigger)  
+- Ручной старт пайплайна  
+- Требует подтверждения (например, через workflow_dispatch)  
+
+Job 2: Update GitOps Repo  
+- Изменение `values.yaml` или манифестов Helm  
+- Обновление версии чарта (если нужно)  
+- Создание PR с описанием изменений  
+- Прикрепление ссылок на документацию  
+
+Job 3: Merge PR  
+- Автоматическое слияние после одобрения  
+- Запуск CI/CD‑пайплайна в GitOps‑репозитории  
+- Запись версии релиза в changelog  
+
+Job 4: ArgoCD Sync Verification  
+- Мониторинг синхронизации в ArgoCD  
+- Проверка статусов Helm‑релизов  
+- Валидация Pods/Deployments  
+- Оповещение о результате (Slack/Email)
+
+## Контроль качества кода
+
+Перед запуском security-сканирований код проходит обязательные проверки качества.
+
+Контроль качества реализован через линтеры и статический анализ.
+
+### Application code
+
+**Python**
+
+- Flake8 — анализ стиля и потенциальных ошибок  
+- Black — стандартизированное форматирование  
+- Isort — управление импортами  
+- MyPy — статическая типизация
+
+**Frontend**
+
+- ESLint — анализ JavaScript/TypeScript  
+- Prettier — единый стиль форматирования
+
+### Scripts и конфигурации
+
+- Shellcheck — проверка shell-скриптов  
+- Dotenv-linter — контроль .env конфигураций  
+- Yamllint — валидация YAML
+
+### Infrastructure as Code
+
+Контроль качества инфраструктурного кода.
+
+- Terraform fmt  
+- Terraform validate  
+- TFLint  
+- Ansible-lint  
+- Helm lint  
+- Helmfile lint
+
+Такая проверка предотвращает ошибки конфигурации до запуска security-сканирований.
+
+
+## Security-проверки в CI
+
+В CI реализована система автоматизированных **security-гейтов**, при необходимости блокирующих небезопасный код, зависимости и инфраструктурные конфигурации.
+
+Каждый инструмент закрывает отдельный класс угроз.
+
+
+### Секреты / Утечки (Gitleaks)
+
+Проверка репозитория на наличие секретов и чувствительных данных.
+
+Gitleaks используется для обнаружения:
+
+- API-ключей  
+- токенов доступа  
+- приватных ключей  
+- паролей и credentials
+
+Сканирование выполняется на каждом Pull Request и блокирует утечку секретов в репозиторий.
+
+
+### SAST (SonarQube, Semgrep)
+
+Статический анализ безопасности исходного кода.
+
+Используются два уровня анализа:
+
+**Semgrep**
+
+- быстрый security-анализ  
+- правила OWASP Top-10  
+- кастомные политики безопасности
+
+**SonarQube**
+
+- глубокий анализ качества и безопасности кода  
+- контроль technical debt  
+- централизованные quality gates
+
+Комбинация инструментов обеспечивает баланс между скоростью и глубиной анализа.
+
+
+### SCA зависимостей кода (OWASP Dependency-Check)
+
+Анализ уязвимостей в сторонних зависимостях.
+
+OWASP Dependency-Check сопоставляет используемые библиотеки с базами уязвимостей:
+
+- NVD  
+- CVE  
+- OSS Index
+
+Security-гейт блокирует использование зависимостей с критическими уязвимостями.
+
+
+### Файловая безопасность (Trivy FS)
+
+Сканирование репозитория на наличие уязвимостей и misconfiguration.
+
+Trivy FS анализирует:
+
+- зависимости проекта  
+- конфигурационные файлы  
+- Dockerfile  
+- инфраструктурные манифесты
+
+Инструмент используется как дополнительный уровень проверки репозитория.
+
+
+### Container security (Hadolint)
+
+Статический анализ Dockerfile.
+
+Hadolint выявляет:
+
+- небезопасные инструкции Dockerfile  
+- неправильные базовые образы  
+- нарушения best-practice контейнеризации
+
+Это снижает риск уязвимых или небезопасных контейнерных образов.
+
+
+### IaC security (Checkov)
+
+Анализ безопасности инфраструктурного кода.
+
+Checkov проверяет Terraform и Kubernetes-конфигурации на соответствие security-policy:
+
+- неправильные сетевые правила  
+- небезопасные IAM-настройки  
+- misconfiguration облачных ресурсов
+
+
+### Kubernetes манифесты (Polaris, Kubeconform)
+
+Контроль корректности и безопасности Kubernetes-ресурсов.
+
+**Kubeconform**
+
+- строгая валидация Kubernetes-манифестов  
+- соответствие официальным схемам API
+
+**Polaris**
+
+- анализ security-настроек Pod и Deployment  
+- выявление misconfiguration контейнеров
+
+
+### Policy-as-Code (Open Policy Agent / Conftest)
+
+Политики безопасности реализованы как код.
+
+OPA используется для проверки:
+
+- Kubernetes-манифестов  
+- Terraform конфигураций  
+- Helm-шаблонов
+
+Это позволяет централизованно контролировать security-правила платформы.
+
+
+### DAST (OWASP ZAP)
+
+Динамическое тестирование безопасности приложения.
+
+OWASP ZAP выполняет:
+
+- автоматическое сканирование веб-приложения  
+- обнаружение OWASP Top-10 уязвимостей  
+- анализ API-эндпоинтов
+
+Сканирование запускается на развёрнутом тестовом окружении. 
+Используются baseline и full scan режимы.
+
+
+### Fuzzing (ffuf)
+
+Фаззинг используется для обнаружения скрытых и неочевидных точек атаки.
+
+ffuf применяется для:
+
+- поиска скрытых API-эндпоинтов  
+- обнаружения незащищённых путей  
+- тестирования обработки нестандартных запросов
+
+Это дополняет DAST-сканирование и помогает выявлять нестандартные уязвимости.
+
+--- 
+
+# Software и Supply Chain Security
+
+Контроль безопасности цепочки поставки программного обеспечения.
+
+Фокус — защита зависимостей, артефактов и контейнерных образов на всех этапах доставки.
+
+Подход основан на принципах **Software Supply Chain Security**, **artifact integrity** и **provenance verification**.
+
+
+### Мониторинг зависимостей (Dependabot)
+
+Автоматический мониторинг безопасности зависимостей.
+
+Dependabot отслеживает появление уязвимостей в используемых библиотеках и инициирует Pull Request с обновлениями.
+
+Позволяет:
+
+- оперативно устранять уязвимые версии зависимостей  
+- поддерживать актуальные версии библиотек  
+- снижать риск эксплуатации известных CVE
+
+Конфигурация: [`.github/dependabot.yml`](.github/dependabot.yml)
+
+Документация: [`.github/DEPENDABOT.md`](.github/DEPENDABOT.md)
+
+### SBOM генерация и анализ (Syft, Grype)
+
+Контроль состава программных артефактов.
+
+**Syft**
+
+- генерация **SBOM (Software Bill of Materials)**  
+- инвентаризация зависимостей приложений и контейнерных образов
+
+**Grype**
+
+- анализ SBOM на наличие уязвимостей  
+- сопоставление компонентов с базами CVE
+
+Использование SBOM позволяет обеспечить прозрачность цепочки поставки и контроль состава программных компонентов.
+
+
+### Проверка лицензий (ScanCode Toolkit)
+
+Контроль лицензионных рисков сторонних зависимостей.
+
+ScanCode Toolkit анализирует используемые библиотеки и определяет:
+
+- тип лицензии  
+- возможные лицензионные конфликты  
+- использование запрещённых лицензий
+
+Это позволяет обеспечить соответствие юридическим требованиям при использовании open-source компонентов.
+
+
+### SCA образов (Trivy Image)
+
+Анализ безопасности контейнерных образов.
+
+Trivy Image выполняет сканирование:
+
+- системных пакетов базовых образов  
+- установленных библиотек  
+- конфигураций контейнеров
+
+Security-гейт блокирует использование образов с критическими уязвимостями.
+
+
+### Подпись и контроль артефактов (Cosign)
+
+Обеспечение целостности и подлинности артефактов.
+
+Cosign используется для:
+
+- криптографической подписи контейнерных образов  
+- проверки подлинности образов перед деплоем  
+- защиты от подмены артефактов
+
+Подписанные образы могут быть развернуты только после успешной проверки подписи.
+
+
+### Закрытые артефактории (GHCR, Harbor, Nexus)
+
+Все артефакты хранятся в контролируемых приватных репозиториях.
+
+Это позволяет управлять доступом, контролировать безопасность и отслеживать происхождение артефактов.
+
+**GHCR**
+
+- хранение контейнерных образов, собираемых CI  
+- интеграция с GitHub Actions
+
+**Harbor**
+
+- основной container registry платформы  
+- встроенное сканирование уязвимостей  
+- управление политиками безопасности образов
+
+**Nexus**
+
+- хранение бинарных артефактов  
+- централизованное управление зависимостями
 
 ---
 
-# Архитектура
+# Platform Security
 
-В этом разделе описана структура папок текущего монорепо и приведены ссылки на связанные репозитории проекта, которые отвечают за отдельные части инфраструктуры и приложения.
+Единый уровень платформенной безопасности.
 
-## MVP в проде  
+Безопасность реализована на уровне инфраструктуры, идентификации, сетевых взаимодействий и рантайма Kubernetes-кластера.
 
-UI с 4 кнопками, все запросы проходят через `nginx`:  
+Подход основан на принципах **Zero Trust**, **Least Privilege** и **Defense in Depth**.
 
-![UI](screenshots/health.gurko.ru-ui.png)  
 
-- **Ping API** — проверка доступности API  
-- **Health Check** — self-check сервиса  
-- **Get Version** — версия backend  
-- **DB Test** — подключение к PostgreSQL (insert пользователя)  
+## Identity и Secrets
 
-Дополнительно:  
+Контроль идентификации, доступа и управления секретами реализован через централизованные системы управления.
 
-- **Swagger:**
-  > Эндпоинт Swagger защищён авторизацией через `nginx`: `admin` / `admin`  
 
-![Swagger](screenshots/health.gurko.ru-swagger.png)  
+### Secrets, PKI (HashiCorp Vault)
 
-### Под капотом  
+Централизованное управление секретами и криптографической инфраструктурой.
 
-- Монорепозиторий с CI/CD и DevSecOps.  
-- Локально — **Minikube**, в проде — кластер **k3s** на 3 VPS в **Yandex Cloud**.  
-- Деплой и управление — через **Helm + Helmfile**.  
-- Приложение работает в Kubernetes: автоскейлинг, самовосстановление, изоляция, масштабирование.  
-- HTTPS через **cert-manager + Let's Encrypt**.  
-- Все образы собираются и тегируются в CI/CD, пуш — вручную.  
-- Используются встроенные компоненты k3s:  
-  - `CoreDNS` — DNS внутри кластера  
-  - `local-path-provisioner` — локальное хранилище  
-  - `metrics-server` — HPA и мониторинг  
-  - `svclb` — балансировка доступа к ingress-контроллеру  
+HashiCorp Vault используется для:
 
-### Yandex Cloud структура
+- хранения чувствительных данных  
+- выдачи **dynamic secrets**  
+- управления жизненным циклом credentials  
+- генерации **PKI сертификатов**
 
-![Yandex Cloud](screenshots/yc_mvp_k3s_prod.png)
+Интеграция с Kubernetes позволяет автоматически выдавать и обновлять секреты для сервисов.
+
+Это устраняет необходимость хранения секретов в конфигурациях и репозиториях.
+
+Конфигурация: [`security-platform/secrets/vault`](security-platform/secrets/vault)
+
+Документация: [`README.md`](security-platform/secrets/vault/README.md)
+
+
+### IaM, OIDC/OAuth2 (Keycloak)
+
+Единая система управления идентификацией и доступом.
+
+Keycloak реализует:
+
+- **OIDC / OAuth2 аутентификацию**  
+- **RBAC управление доступами**  
+- централизованную identity-платформу
+
+Система интегрирована с:
+
+- Kubernetes  
+- Argo CD  
+- DevOps-инструментами платформы
+
+Это обеспечивает единый контроль доступа ко всем компонентам инфраструктуры.
+
+Конфигурация: [`security-platform/iam/keycloak`](security-platform/iam/keycloak)
+
+Документация: [`README.md`](security-platform/iam/keycloak/README.md)
+
+## Kubernetes Security
+
+Безопасность Kubernetes реализована на нескольких уровнях: контроль доступа, политики безопасности, рантайм-мониторинг и сетевые механизмы защиты.
+
+### Cluster security (RBAC, NetworkPolicies, SecurityContext)
+
+Базовые механизмы защиты Kubernetes-кластера.
+
+**RBAC**
+
+- управление правами доступа пользователей и сервисных аккаунтов  
+- минимизация привилегий
+
+**NetworkPolicies**
+
+- сегментация сетевого трафика между сервисами  
+- ограничение east-west взаимодействий
+
+**SecurityContext**
+
+- контроль прав контейнеров  
+- запрет привилегированных контейнеров  
+- ограничения capabilities
+
+
+### Admission controller (Kyverno)
+
+Политики безопасности реализованы через admission-контроллер.
+
+Kyverno применяется для:
+
+- проверки Kubernetes-ресурсов перед их созданием  
+- автоматического применения security-политик  
+- запрета небезопасных конфигураций
+
+Примеры политик:
+
+- запрет privileged контейнеров  
+- обязательное использование resource limits  
+- запрет использования latest тегов образов
+
+Конфигурация: [`security-platform/admission-controller/kyverno`](security-platform/admission-controller/kyverno)
+
+Документация: [`README.md`](security-platform/admission-controller/kyverno/README.md)
+
+### Runtime security (Falco, Trivy)
+
+Контроль безопасности выполняется на этапе выполнения контейнеров.
+
+**Falco**
+
+- runtime detection на базе **eBPF**  
+- обнаружение подозрительных действий в контейнерах  
+- выявление атак внутри кластера
+
+Конфигурация: [`security-platform/runtime-security/falco`](security-platform/runtime-security/falco)
+
+Документация: [`README.md`](security-platform/runtime-security/falco/README.md)
+
+**Trivy**
+
+- сканирование контейнерных образов  
+- обнаружение CVE  
+- генерация отчётов уязвимостей
+
+Отчёты используются для контроля соответствия требованиям безопасности.
+
+Конфигурация: [`security-platform/runtime-security/trivy`](security-platform/runtime-security/trivy)
+
+Документация: [`README.md`](security-platform/runtime-security/trivy/README.md)
+
+
+### East-West mTLS (Istio)
+
+Защита сетевого взаимодействия между сервисами.
+
+Service mesh обеспечивает:
+
+- **mTLS шифрование трафика между сервисами**  
+- аутентификацию сервисов  
+- контроль сетевых политик
+
+Это предотвращает перехват и подмену сервисного трафика внутри кластера.
+
+Конфигурация: [`security-platform/service-mesh/istio`](security-platform/service-mesh/istio)
+
+Документация: [`README.md`](security-platform/service-mesh/istio/README.md)
+
+### CIS Benchmark (kube-bench)
+
+Аудит безопасности Kubernetes-кластера.
+
+kube-bench выполняет проверку соответствия **CIS Kubernetes Benchmark**.
+
+Проверяются:
+
+- настройки API-сервера  
+- параметры kubelet  
+- конфигурация control-plane
+
+Результаты используются для выявления misconfiguration инфраструктуры.
+
+Конфигурация: [`security-platform/cluster-security/kube-bench`](security-platform/cluster-security/kube-bench)
+
+Документация: [`README.md`](security-platform/cluster-security/kube-bench/README.md)
 
 ---
 
-## Локальная архитектура  
+# Управление уязвимостями и ASOC
 
-### infra_compose/: Расширенная версия в Docker Compose  
+Централизованная система управления уязвимостями.
 
-В `infra_compose/` запускается полный технологический стек проекта (18 контейнеров), включая backend, frontend, брокеры Kafka/Zookeeper, PostgreSQL + PgBouncer, observability (Prometheus, VictoriaMetrics, Grafana, Jaeger, Alertmanager) и экспортёры.  
+Платформа агрегирует результаты всех security-сканирований, обеспечивает их обработку и управляет жизненным циклом уязвимостей.
 
-> Подробное описание сервисов, эндпоинтов и override-конфигураций — в отдельном репозитории [infra-docker-compose-health-api](https://github.com/Vikgur/prod-ready-dockerized-microservice-stack).  
+Подход основан на принципах **Application Security Orchestration and Correlation (ASOC)** и **Continuous Vulnerability Management**.
 
-### MVP-версия в Minikube  
 
-Локальный запуск проекта в **Minikube** для отработки DevOps-цикла. Управление через **Helm**, используются готовые (PostgreSQL) и кастомные чарты (backend, frontend, nginx, swagger).  
+## ASOC (DefectDojo)
 
-Cервисы:
-- **backend** — Flask API (2 пода).  
-- **frontend** — React SPA.  
-- **postgres** — база данных.  
-- **nginx** — ingress и точка входа.  
-- **swagger** — OpenAPI UI.  
-- **jaeger** — заглушка для трейсов.  
+Центральная платформа управления результатами security-сканирований.
 
-> Подробности и инструкции — в отдельном репозитории [k8s-local-minikube-health-api](https://github.com/Vikgur/k8s-local-minikube-health-api).  
+DefectDojo используется для:
 
-## backend/: Backend-сервис  
+- централизованного сбора отчётов из security-инструментов  
+- корреляции результатов разных сканеров  
+- дедупликации уязвимостей  
+- отслеживания жизненного цикла vulnerabilities
 
-В `backend/` находится API на **Python (Flask)** с базовой бизнес-логикой, health-check эндпоинтами и подключением к PostgreSQL и Kafka. Для unit-тестирования используется **Pytest**, конфигурация обернута в Dockerfile и Helm-чарт.  
+В платформу импортируются отчёты из:
 
-> Подробное описание сервиса и его кода — в отдельном репозитории [backend-health-api](https://github.com/Vikgur/health-api-for-microservice-stack).  
+- SAST  
+- SCA  
+- DAST  
+- container scanning  
+- IaC scanning
 
-## frontend/: Frontend-сервис  
+Это формирует единую точку управления безопасностью приложений.
 
-В `frontend/` реализован SPA-интерфейс на **React + Vite**, который взаимодействует с backend через REST API. Проект упакован в Docker-образ, статика отдаётся через Nginx, доступна интеграция со Swagger UI.  
+Конфигурация: [`security-platform/vulnerability-management/defectdojo`](security-platform/vulnerability-management/defectdojo)
 
-> Подробное описание реализации и сборки фронтенда — в отдельном репозитории [frontend-health-api-ui](https://github.com/Vikgur/health-api-ui-for-microservice-stack).  
+Документация: [`README.md`](security-platform/vulnerability-management/defectdojo/README.md)
 
-## e2e_tests/: End-to-End тесты  
 
-В `e2e_tests/` собраны **E2E тесты** на Python (**Pytest + Allure**) для проверки функциональности приложения в проде и стейдже. Тестируются основные сценарии UI и API, используется отдельный CI workflow.  
+## AppSec процессы
 
-> Подробное описание структуры тестов и генерации отчетов — в отдельном репозитории [e2e-tests-health-api](https://github.com/Vikgur/e2e-tests-health-api-for-microservice-stack).  
+В системе реализован полный цикл обработки уязвимостей.
 
-## Makefile  
+Каждая обнаруженная уязвимость проходит стандартный AppSec workflow.
 
-Файл сделан минималистично — как пример того, что инфраструктурные задачи можно запускать единообразно через `make`. При необходимости легко расширяется новыми командами (Helm, CI-чеки, деплой и т.п.).   
 
-Текущий Makefile в корне репозитория служит фасадом для локальной работы с инфраструктурой:  
+### Триаж
 
-- **infra_compose-up / down** — запуск и остановка полной версии окружения через Docker Compose.  
-- **infra_compose-lint** — локальные DevSecOps-проверки для `infra_compose/` (`dotenv-linter`, `yamllint`, `shellcheck`, `gitleaks`).  
-- **services-test** — запуск тестов сервисов (плейсхолдер для демонстрации).  
-- **docs-sync** — синхронизация документации (плейсхолдер).  
+Первичная обработка результатов сканирования.
 
-## .github/: CI/CD структура  
+На этапе триажа выполняется:
 
-Единый CI/CD реализован через **GitHub Actions** для каталогов:  
-- `backend/` — API (Flask) + unit-тесты.  
-- `frontend/` — SPA (React + Vite).  
-- `e2e_tests/` — e2e-тесты (Pytest + Allure).  
-- `helm/` — чарты и Helmfile для прод-деплоя.  
-- `infra/` — `nginx` и docker-compose для всех 18 контейнеров.  
-- `mvp_compose/` — упрощённый прод-стек (9 контейнеров).  
+- анализ критичности уязвимости  
+- проверка воспроизводимости  
+- определение зоны ответственности (разработка / инфраструктура)
 
-Workflow:  
-- `.github/workflows/ci-deploy.yml` — основной CI/CD-процесс.  
-- `.github/workflows/release-image.yml` — релиз backend/frontend образов.  
+После анализа уязвимости назначаются ответственным командам.
 
-### Успешный прогон
 
-![CI](screenshots/monorepo_ci.png)  
+### Обработка False Positive
 
-### Артефакты
+Обработка ложных срабатываний security-инструментов.
 
-![CI](screenshots/monorepo_ci_artifacts.png)  
+Если уязвимость подтверждается как ложная:
 
-> Подробная структура и описание пайплайна — в отдельном репозитории [ci-gitops-health-api](https://github.com/vikgur/ci-gitops-health-api). 
+- она маркируется как **False Positive**  
+- фиксируется причина  
+- исключается из дальнейших отчётов
 
-## ansible/: Ansible-автоматизация  
+Это снижает шум в системе управления уязвимостями.
 
-В `ansible/` реализованы роли для установки и настройки **k3s-кластера**, а также деплоя приложения через Helmfile. Окружения разделены на stage и prod, конфигурации хранятся в `inventories/`.  
 
-> Подробное описание ролей, плейбуков и DevSecOps-практик — в отдельном репозитории [ansible-gitops-bootstrap-health-api](https://github.com/vikgur/ansible-gitops-bootstrap-health-api).  
+### Принятие рисков
 
-## helm/: Структура для Dev и Prod  
+Формализованный процесс принятия рисков.
 
-В `helm/` хранится единый набор чартов и values для Dev и Prod, реализованы стратегии деплоя **Blue/Green** и **Canary**. Dev и Prod используют одни и те же чарты, различия задаются только через values.  
+Если уязвимость не может быть устранена немедленно:
 
-> Подробное описание внедренных стратегий деплоя, Kubernetes Best Practices в Helm-чартах и DevSecOps-практик — в отдельном репозитории [helm-blue-green-canary-gitops-health-api](https://github.com/vikgur/helm-blue-green-canary-gitops-health-api).  
+- выполняется оценка риска  
+- фиксируется обоснование  
+- устанавливается срок пересмотра
 
-## terraform/: Terraform/Terragrunt-инфраструктура  
-
-В `terraform/` описана IaC-инфраструктура в **Yandex Cloud**: сети, ВМ под кластер k3s и сопутствующие ресурсы. Используется backend в Object Storage, переменные вынесены в tfvars.  
-
-> Подробное описание инфраструктуры и DevSecOps-практик — в отдельном репозитории [terraform-terragrunt-yandex-cloud-health-api](https://github.com/Vikgur/terraform-terragrunt-yandex-cloud-health-api).  
-
-## Bash-скрипты  
-
-В проекте используется набор **Bash-скриптов** для автоматизации рутинных шагов: генерация инвентаря Ansible, синхронизация файлов на мастер-ноду, запуск плейбуков и вспомогательные операции при деплое.  
-
-Скрипты оформлены по best practices с минимизацией ручных действий.  
-
-> Подробное описание и полный набор скриптов — в отдельном репозитории [bash-scripts-gitops-health-api](https://github.com/Vikgur/bash-scripts-gitops-health-api).  
+Такая процедура позволяет документировать управляемые риски и поддерживать прозрачность AppSec-процессов.
 
 ---
 
-# DevSecOps/Безопасность
+# Моделирование угроз
 
-В проект встроен демонстрационный слой **DevSecOps** для паттерна **монорепо**: используются baseline-конфигурации для статического анализа, поиска секретов, сканирования уязвимостей и аудита Kubernetes/ Terraform через Policy-as-Code. Основные настройки собраны в `security_local/config`, а правила в `security_local/policy`.
+Методология анализа угроз и системный маппинг рисков.
 
-## security_local/config  
+Threat Modeling используется как архитектурный инструмент для выявления угроз на ранних этапах разработки и проектирования системы.
 
-Конфигурации для инструментов **DevSecOps**:  
+Анализ выполняется на уровне приложения, инфраструктуры и DevOps-процессов.
 
-- **checkov/base.yaml** — baseline для анализа Terraform и Kubernetes.  
-- **semgrep/base.yml** — правила статического анализа кода.  
-- **gitleaks/base.toml** — поиск секретов и ключей.  
-- **polaris/polaris.yaml** — аудит Kubernetes-манифестов на best practices.  
-- **trivy/trivy.yaml** — сканирование файловой системы и образов.  
-- **yamllint/yamllint.yaml** — проверка YAML (Helm, Ansible, CI) на стиль и ошибки.  
 
-## security_local/policy  
+## Методология (STRIDE)
 
-Правила **Policy-as-Code** для проверки инфраструктуры и Kubernetes-манифестов через **OPA/Conftest**:  
+Моделирование угроз проводится по методологии **STRIDE**.
 
-- **terraform/security.rego** — проверки Terraform (запрет `0.0.0.0/0`, требование тегов, KMS для storage).  
-- **kubernetes/security.rego** — проверки Pod/Deployment/Service (`runAsNonRoot`, запрет privileged, hostNetwork/hostPID/hostIPC, обязательные requests/limits).  
-- **kubernetes/security_test.rego** — unit-тесты rego-правил.  
+Методология используется для систематического анализа архитектуры и выявления классов угроз:
 
-## .pre-commit-config.yaml  
+- **Spoofing** — подмена идентификации  
+- **Tampering** — изменение данных или конфигураций  
+- **Repudiation** — отказ от совершённых действий  
+- **Information Disclosure** — утечка конфиденциальной информации  
+- **Denial of Service** — отказ в обслуживании  
+- **Elevation of Privilege** — повышение привилегий
 
-Конфигурация хуков **pre-commit** для автоматических проверок перед коммитом.  
-Включает:  
+Для каждого класса угроз определяются механизмы защиты на уровне приложения, инфраструктуры и платформы.
 
-- **Python**: Black, Isort, Flake8  
-- **Frontend**: Prettier  
-- **Bash**: Shellcheck  
-- **YAML**: Yamllint (конфиг `security_local/config/.yamllint.yml`)  
-- **Dotenv**: dotenv-linter  
-- **Kubernetes/Helm**: Helm lint, Helmfile lint, Kubeconform (`-strict`)  
-- **Ansible**: ansible-lint  
-- **DevSecOps**:  
-  - Gitleaks (конфиг `security_local/config/gitleaks/.gitleaks.toml`)  
-  - Semgrep (конфиг `security_local/config/semgrep`)  
-- **Generic**: trailing-whitespace, end-of-file-fixer, check-yaml, check-json, check-added-large-files, detect-private-key  
 
-Используется для унификации кода, раннего выявления ошибок и обеспечения качества на локальном этапе разработки.  
+## Домены риска
+
+Моделирование угроз проводится для ключевых компонентов архитектуры.
+
+### Application
+
+Риски уровня бизнес-логики и серверной обработки данных.
+
+Контроль реализован через:
+
+- SAST  
+- SCA  
+- secure coding practices  
+- dependency management  
+- security testing
+
+### API
+
+Риски, связанные с взаимодействием клиентов и сервисов.
+
+Контроль реализован через:
+
+- DAST тестирование  
+- fuzzing  
+- API security scanning  
+- аутентификацию и авторизацию через OIDC
+
+### Kubernetes
+
+Риски инфраструктуры контейнерной платформы.
+
+Контроль реализован через:
+
+- RBAC  
+- NetworkPolicies  
+- admission policies  
+- runtime security  
+- CIS benchmark auditing
+
+### CI/CD
+
+Риски цепочки поставки программного обеспечения.
+
+Контроль реализован через:
+
+- security gates в CI  
+- artifact signing  
+- supply chain security  
+- контроль зависимостей  
+- централизованное управление артефактами
+
+## OWASP Top-10:2025 маппинг
+
+В проекте реализовано покрытие категорий **OWASP Top-10:2025** через комбинацию DevSecOps-процессов, security-инструментов и архитектурных механизмов защиты.
+
+### A01 — Broken Access Control
+
+Контроль доступа реализован на уровне платформы и приложений.
+
+Механизмы защиты:
+
+- RBAC в Kubernetes  
+- OIDC/OAuth2 аутентификация (Keycloak)  
+- сервисная аутентификация  
+- NetworkPolicies  
+- policy enforcement через Kyverno  
+- API security тестирование (DAST, fuzzing)
+
+Это предотвращает несанкционированный доступ к сервисам и данным.
+
+
+### A02 — Security Misconfiguration
+
+Контроль конфигураций инфраструктуры и платформы.
+
+Механизмы защиты:
+
+- Checkov (IaC security scanning)  
+- Polaris (Kubernetes security checks)  
+- kube-bench (CIS benchmark auditing)  
+- Terraform validate / TFLint  
+- Ansible-lint  
+- Helm lint / Helmfile lint
+
+Такая проверка предотвращает ошибки конфигурации инфраструктуры и Kubernetes.
+
+
+### A03 — Software Supply Chain Failures
+
+Контроль цепочки поставки программного обеспечения.
+
+Механизмы защиты:
+
+- Dependabot (monitoring зависимостей)  
+- OWASP Dependency-Check  
+- SBOM генерация (Syft)  
+- SBOM анализ (Grype)  
+- container scanning (Trivy)  
+- artifact signing (Cosign)  
+- приватные registry (GHCR, Harbor, Nexus)
+
+Это обеспечивает контроль происхождения и безопасности программных компонентов.
+
+
+### A04 — Cryptographic Failures
+
+Защита криптографических механизмов и секретов.
+
+Механизмы защиты:
+
+- централизованное управление секретами (Vault)  
+- PKI инфраструктура  
+- mTLS между сервисами (Istio)  
+- безопасное хранение credentials
+
+Это предотвращает утечку чувствительных данных и компрометацию ключей.
+
+
+### A05 — Injection
+
+Обнаружение и предотвращение инъекционных атак.
+
+Механизмы защиты:
+
+- SAST (Semgrep, SonarQube)  
+- DAST (OWASP ZAP)  
+- fuzzing тестирование (ffuf)  
+- secure coding practices  
+- dependency scanning
+
+Эти проверки выявляют уязвимости до попадания кода в production.
+
+
+### A06 — Insecure Design
+
+Контроль архитектурных рисков и ошибок проектирования.
+
+Механизмы защиты:
+
+- threat modeling (STRIDE)  
+- secure architecture review  
+- security-by-design  
+- policy-as-code
+
+Это снижает вероятность появления системных архитектурных уязвимостей.
+
+
+### A07 — Authentication Failures
+
+Контроль механизмов аутентификации и управления идентификацией.
+
+Механизмы защиты:
+
+- OIDC / OAuth2 (Keycloak)  
+- централизованная identity-платформа  
+- RBAC управление доступом  
+- сервисная аутентификация
+
+Это предотвращает компрометацию учетных записей и обход аутентификации.
+
+
+### A08 — Software or Data Integrity Failures
+
+Контроль целостности программных артефактов и данных.
+
+Механизмы защиты:
+
+- SBOM  
+- Cosign подпись контейнерных образов  
+- artifact provenance  
+- контроль registry  
+- GitOps delivery
+
+Такая модель предотвращает подмену программных компонентов.
+
+
+### A09 — Logging & Alerting Failures
+
+Контроль журналирования и обнаружения инцидентов.
+
+Механизмы защиты:
+
+- observability stack (Prometheus, Grafana)  
+- distributed tracing (Jaeger)  
+- runtime detection (Falco)  
+- централизованный анализ security-событий
+
+Это обеспечивает обнаружение атак и аномалий в инфраструктуре.
+
+
+### A10 — Mishandling of Exceptional Conditions
+
+Контроль обработки ошибок и нестандартных ситуаций.
+
+Механизмы защиты:
+
+- secure error handling в приложении  
+- SAST анализ ошибок обработки исключений  
+- fuzzing тестирование  
+- DAST проверка некорректных запросов
+
+Это предотвращает утечки данных и уязвимости, возникающие при ошибках выполнения.
+
+
+## CWE Top-25 маппинг
+
+Результаты статического анализа и сканирования зависимостей сопоставляются с **CWE Top-25 Most Dangerous Software Weaknesses**.
+
+Маппинг позволяет:
+
+- классифицировать уязвимости по типам слабостей ПО  
+- анализировать системные ошибки разработки  
+- контролировать устранение наиболее критичных классов уязвимостей
+
+Основные источники данных:
+
+- **SAST** (Semgrep, SonarQube)  
+- **SCA** (OWASP Dependency-Check, Trivy, Grype)
+
+Результаты агрегируются в **DefectDojo**, где выполняется корреляция и управление жизненным циклом уязвимостей.
+
+
+### CWE-79 — Cross-Site Scripting (XSS)
+
+Обнаружение:
+
+- SAST (Semgrep, SonarQube)  
+- DAST (OWASP ZAP)
+
+Контроль:
+
+- secure input validation  
+- output encoding  
+- frontend linting
+
+
+### CWE-89 — SQL Injection
+
+Обнаружение:
+
+- SAST анализ backend-кода  
+- DAST сканирование API
+
+Контроль:
+
+- ORM и параметризованные запросы  
+- secure coding practices
+
+
+### CWE-20 — Improper Input Validation
+
+Обнаружение:
+
+- SAST  
+- fuzzing (ffuf)
+
+Контроль:
+
+- строгая валидация входных данных  
+- API testing
+
+
+### CWE-78 — OS Command Injection
+
+Обнаружение:
+
+- SAST правила Semgrep  
+- SonarQube security rules
+
+Контроль:
+
+- запрет небезопасных системных вызовов  
+- secure coding guidelines
+
+
+### CWE-22 — Path Traversal
+
+Обнаружение:
+
+- SAST  
+- DAST
+
+Контроль:
+
+- строгая обработка путей  
+- ограничение доступа к файловой системе
+
+
+### CWE-352 — Cross-Site Request Forgery (CSRF)
+
+Обнаружение:
+
+- DAST (OWASP ZAP)
+
+Контроль:
+
+- CSRF-tokens  
+- secure session management
+
+
+### CWE-434 — Unrestricted File Upload
+
+Обнаружение:
+
+- SAST  
+- DAST
+
+Контроль:
+
+- проверка типов файлов  
+- sandboxing загрузок
+
+
+### CWE-287 — Improper Authentication
+
+Обнаружение:
+
+- SAST  
+- security-review архитектуры
+
+Контроль:
+
+- OIDC/OAuth2 аутентификация (Keycloak)  
+- централизованный IAM
+
+
+### CWE-862 — Missing Authorization
+
+Обнаружение:
+
+- SAST анализ бизнес-логики
+
+Контроль:
+
+- RBAC  
+- policy-based access control
+
+
+### CWE-269 — Improper Privilege Management
+
+Контроль:
+
+- Kubernetes RBAC  
+- Kyverno policies  
+- SecurityContext
+
+
+### CWE-502 — Deserialization of Untrusted Data
+
+Обнаружение:
+
+- SAST правила Semgrep
+
+Контроль:
+
+- безопасная сериализация  
+- проверка источников данных
+
+
+### CWE-476 — NULL Pointer Dereference
+
+Обнаружение:
+
+- статический анализ (SonarQube)
+
+Контроль:
+
+- secure coding practices  
+- строгая типизация (MyPy)
+
+
+### CWE-416 — Use After Free
+
+Обнаружение:
+
+- SAST
+
+Контроль:
+
+- безопасные библиотеки  
+- анализ зависимостей
+
+
+### CWE-190 — Integer Overflow
+
+Обнаружение:
+
+- SAST правила анализа арифметики
+
+Контроль:
+
+- проверка границ значений  
+- безопасные операции
+
+
+### CWE-400 — Uncontrolled Resource Consumption
+
+Контроль:
+
+- Kubernetes resource limits  
+- rate limiting  
+- нагрузочное тестирование
+
+
+### CWE-918 — Server-Side Request Forgery (SSRF)
+
+Обнаружение:
+
+- DAST  
+- fuzzing
+
+Контроль:
+
+- NetworkPolicies  
+- service mesh  
+- контроль исходящих соединений
+
+
+### CWE-522 — Insufficiently Protected Credentials
+
+Контроль:
+
+- HashiCorp Vault  
+- dynamic secrets  
+- исключение хранения секретов в коде
+
+
+### CWE-798 — Hardcoded Credentials
+
+Обнаружение:
+
+- Gitleaks  
+- SAST
+
+Контроль:
+
+- централизованное управление секретами
+
+
+### CWE-306 — Missing Authentication for Critical Function
+
+Контроль:
+
+- OIDC/OAuth2  
+- API security testing
+
+
+### CWE-284 — Improper Access Control
+
+Контроль:
+
+- Kubernetes RBAC  
+- Kyverno policies  
+- IAM управление доступом
+
+
+### CWE-94 — Code Injection
+
+Обнаружение:
+
+- SAST  
+- DAST
+
+Контроль:
+
+- secure coding practices  
+- input validation
+
+
+### CWE-200 — Information Exposure
+
+Обнаружение:
+
+- SAST  
+- DAST
+
+Контроль:
+
+- secure error handling  
+- контроль логирования
+
+
+### CWE-770 — Allocation of Resources Without Limits
+
+Контроль:
+
+- Kubernetes resource quotas  
+- pod limits
+
+
+### CWE-285 — Improper Authorization
+
+Контроль:
+
+- RBAC  
+- policy-based access control
+
+
+### CWE-918 — Server-Side Request Forgery (повторная категория)
+
+Контроль:
+
+- network segmentation  
+- API validation  
+- outbound traffic policies
+
+---
+
+# Регуляторные требования и стандарты
+
+Связь технических контролей платформы с требованиями российских нормативных актов, международных стандартов и фреймворков.
+
+Архитектура платформы построена так, чтобы реализованные DevSecOps‑контроли могли быть напрямую сопоставлены с требованиями регуляторов. Такой подход позволяет использовать платформу как демонстрационную модель реализации требований информационной безопасности.
+
+
+## Российские регуляторы
+
+Проект демонстрирует технические механизмы реализации требований основных российских регуляторов ИБ.
+
+
+### ФСТЭК
+
+Реализация технических мер защиты информации в соответствии с требованиями ФСТЭК.
+
+
+**Нормативная база**  
+- приказ № 117 от 11.04.2025 (вступает в силу с 01.03.2026);
+- приказ № 235 от 21.12.2017;
+- приказ № 239 от 25.12.2017;
+- приказ № 77 (требования к аттестации информационных систем);
+- приказ № 76 (уровни доверия к средствам защиты информации).
+
+**Соответствующие технические контроли**  
+
+Контроль доступа
+- Keycloak (OIDC / OAuth2, RBAC);
+- Kubernetes RBAC;
+- NetworkPolicies.
+
+Управление уязвимостями  
+- DefectDojo (ASOC);
+- SAST / SCA / DAST;
+- Trivy, Dependency‑Check, Semgrep.
+
+Контроль целостности ПО  
+- Cosign подпись артефактов;
+- SBOM (Syft, Grype).
+
+Контроль конфигураций  
+- Checkov (IaC security);
+- Polaris;
+- kube‑bench (аудит соответствия CIS benchmark).
+
+Контроль событий безопасности  
+- Falco runtime detection;
+- observability stack.
+
+Такая архитектура реализует технические меры защиты информации, требуемые регулятором, включая управление изменениями и аудит конфигураций.
+
+### ФЗ‑187
+
+Закон о безопасности критической информационной инфраструктуры.
+
+**Нормативная база**  
+- ФЗ‑187;
+- ПП РФ № 127 от 08.02.2018 (категорирование объектов КИИ);
+- ПП РФ № 1912 от 14.11.2023;
+- ст. 5 ФЗ‑187 (взаимодействие с ГосСОПКА);
+- ст. 10 ФЗ‑187 (требования к защите КИИ).
+
+**Реализованные меры**  
+
+Контроль доступа  
+- централизованный IAM (Keycloak);
+- RBAC;
+- сервисная аутентификация.
+
+Контроль сетевых взаимодействий  
+- NetworkPolicies;
+- service mesh (Istio);
+- mTLS между сервисами.
+
+Контроль безопасности инфраструктуры  
+- Kubernetes security policies;
+- admission control (Kyverno);
+- CIS benchmark auditing (kube‑bench).
+
+Мониторинг безопасности  
+- Falco runtime security;
+- observability stack;
+- централизованный анализ событий;
+- взаимодействие с ГосСОПКА отсутствует (реализация требований ст. 5 ФЗ‑187).
+
+### ФЗ‑152
+
+Защита персональных данных.
+
+**Нормативная база**  
+- ФЗ‑152;
+- ПП РФ № 1119 от 01.11.2012;
+- приказ ФСТЭК № 21 (меры по обеспечению безопасности ПДн).
+
+**Реализованные меры защиты**  
+
+Контроль доступа к данным  
+- OIDC / OAuth2 аутентификация;
+- RBAC;
+- сегментация сетевых взаимодействий.
+
+Защита данных  
+- управление секретами через Vault;
+- PKI инфраструктура;
+- шифрование сервисных коммуникаций (mTLS).
+
+Контроль уязвимостей  
+- SAST / SCA / DAST;
+- управление уязвимостями (DefectDojo).
+
+Журналирование и мониторинг   
+- observability stack;
+- runtime security detection.
+
+Документация и учёт  
+- регистрация в реестре операторов Роскомнадзора отсутствует (требование ФЗ‑152);
+- ведение журналов доступа и изменений в соответствии с приказом ФСТЭК № 21.
+
+### ФСБ
+
+Требования к криптографической защите информации.
+
+**Нормативная база**  
+- приказ № 378 от 10.07.2014;
+- приказы № 539, 546, 547, 553, 554 (2025);
+- требования к эксплуатации СКЗИ (ведение журналов, контроль актуальности сертификатов).
+
+**Реализованные механизмы**  
+
+Криптографическая защита  
+- PKI инфраструктура (Vault);
+- mTLS шифрование сервисного трафика;
+- управление сертификатами (включая их жизненный цикл и актуальность).
+
+Контроль целостности программного обеспечения  
+- Cosign подпись контейнерных образов;
+- контроль provenance артефактов.
+
+Защита секретов  
+- централизованное управление секретами;
+- dynamic secrets;
+- ведение журналов эксплуатации СКЗИ (требование приказа № 378).
+
+Соответствие требованиям к СКЗИ  
+- использование сертифицированных СКЗИ ФСБ отсутствует;
+- соблюдение правил эксплуатации СКЗИ, включая контроль за актуальностью сертификатов.
+
+Такая архитектура демонстрирует практическую реализацию криптографической защиты в cloud‑native инфраструктуре, включая общие требования к ведению документации и аудиту, но с отсутствием сертифицированных СКЗИ ФСБ.
+
+## Российские стандарты
+
+Соответствие Secure SDLC практикам российских стандартов разработки безопасного программного обеспечения.
+
+Технические механизмы DevSecOps-платформы напрямую маппируются на требования стандартов жизненного цикла разработки, контроля безопасности кода и управления уязвимостями.
+
+
+### ГОСТ Р 56939-2024
+
+Актуальный стандарт безопасной разработки программного обеспечения.
+
+Стандарт определяет требования к **Secure SDLC**, управлению уязвимостями и контролю безопасности на всех этапах разработки.
+
+**Реализованные практики**
+
+Secure SDLC
+
+- CI/CD security gates  
+- автоматизированные security-проверки
+
+Статический и динамический анализ
+
+- SAST (Semgrep, SonarQube)  
+- DAST (OWASP ZAP)
+
+Контроль зависимостей
+
+- OWASP Dependency-Check  
+- SBOM (Syft, Grype)
+
+Управление уязвимостями
+
+- централизованная платформа ASOC (DefectDojo)  
+- triage / false positive / risk acceptance workflow
+
+Threat modeling
+
+- STRIDE  
+- OWASP Top-10 и CWE Top-25 маппинг
+
+
+### ГОСТ Р 56938-2016
+
+Стандарт организации безопасного жизненного цикла разработки программного обеспечения.
+
+**Реализованные практики**
+
+Безопасная разработка
+
+- secure coding guidelines  
+- code quality gates
+
+Контроль безопасности кода
+
+- SAST  
+- dependency scanning
+
+Контроль конфигураций
+
+- IaC security scanning (Checkov)  
+- Kubernetes policy enforcement (Kyverno)
+
+Контроль релизов
+
+- GitOps delivery  
+- подписанные артефакты (Cosign)
+
+
+### ГОСТ Р 58833-2020
+
+Стандарт процессов анализа уязвимостей программного обеспечения.
+
+**Реализованные механизмы**
+
+Поиск уязвимостей
+
+- SAST  
+- DAST  
+- container scanning
+
+Агрегация результатов
+
+- централизованный сбор отчётов (DefectDojo)
+
+Управление уязвимостями
+
+- triage  
+- false positive handling  
+- risk acceptance
+
+Отслеживание устранения
+
+- lifecycle management vulnerabilities
+
+
+### ГОСТ Р 594531-2021
+
+Стандарт управления безопасностью программного обеспечения.
+
+**Реализованные механизмы**
+
+Контроль безопасности разработки
+
+- DevSecOps процессы  
+- CI/CD security gates
+
+Контроль инфраструктуры
+
+- IaC security scanning  
+- Kubernetes security policies
+
+Контроль поставки ПО
+
+- software supply chain security  
+- SBOM  
+- artifact signing
+
+
+### ГОСТ Р 594532-2021
+
+Стандарт обеспечения безопасности программного обеспечения при эксплуатации.
+
+**Реализованные механизмы**
+
+Мониторинг безопасности
+
+- observability stack  
+- runtime detection (Falco)
+
+Контроль инфраструктуры
+
+- Kubernetes runtime security  
+- CIS benchmark auditing
+
+Контроль уязвимостей
+
+- container scanning  
+- dependency monitoring
+
+
+### ГОСТ Р 59547-2021
+
+Стандарт процессов анализа и обработки уязвимостей.
+
+**Реализованные механизмы**
+
+Управление уязвимостями
+
+- централизованная ASOC платформа (DefectDojo)
+
+Корреляция результатов сканирований
+
+- SAST  
+- SCA  
+- DAST  
+- container scanning
+
+Процессы обработки уязвимостей
+
+- triage workflow  
+- false positive handling  
+- risk acceptance
+
+Это обеспечивает управляемый жизненный цикл vulnerabilities в DevSecOps-среде.
+
+## Международные стандарты
+
+Архитектура платформы и DevSecOps-процессы сопоставлены с требованиями международных стандартов управления информационной безопасностью.
+
+Технические контроли реализуют практические механизмы, используемые в рамках **ISMS (Information Security Management System)** и процессов управления рисками.
+
+
+### ISO/IEC 27001:2022
+
+Стандарт управления системой информационной безопасности (ISMS).
+
+Платформа демонстрирует техническую реализацию ключевых доменов контроля безопасности.
+
+**Реализованные механизмы**
+
+Контроль доступа
+
+- централизованный IAM (Keycloak)  
+- RBAC в Kubernetes  
+- NetworkPolicies
+
+Управление уязвимостями
+
+- SAST / SCA / DAST  
+- container scanning  
+- централизованная платформа ASOC (DefectDojo)
+
+Контроль разработки и изменений
+
+- CI/CD security gates  
+- GitOps delivery  
+- policy-as-code
+
+Контроль целостности программного обеспечения
+
+- SBOM генерация  
+- Cosign подпись контейнерных образов  
+- контроль provenance артефактов
+
+Мониторинг безопасности
+
+- observability stack  
+- runtime detection (Falco)
+
+
+### ISO/IEC 27002:2022
+
+Практические рекомендации по реализации мер защиты информации.
+
+DevSecOps-архитектура платформы реализует ключевые технические контроли стандарта.
+
+**Реализованные механизмы**
+
+Secure development
+
+- secure SDLC  
+- статический анализ кода  
+- dependency scanning
+
+Identity и доступ
+
+- OIDC / OAuth2 аутентификация  
+- RBAC  
+- сервисная аутентификация
+
+Управление секретами
+
+- HashiCorp Vault  
+- dynamic secrets  
+- PKI инфраструктура
+
+Безопасность инфраструктуры
+
+- Kubernetes security policies  
+- admission control (Kyverno)  
+- CIS benchmark auditing
+
+Безопасность сети
+
+- NetworkPolicies  
+- service mesh (Istio)  
+- mTLS между сервисами
+
+
+### ISO/IEC 27005:2022
+
+Стандарт управления рисками информационной безопасности.
+
+В проекте реализована модель управления рисками на основе threat modeling и централизованного управления уязвимостями.
+
+**Реализованные механизмы**
+
+Анализ угроз
+
+- threat modeling (STRIDE)  
+- маппинг OWASP Top-10  
+- маппинг CWE Top-25
+
+Оценка уязвимостей
+
+- SAST  
+- SCA  
+- DAST  
+- container scanning
+
+Управление рисками
+
+- triage workflow  
+- false positive handling  
+- risk acceptance process
+
+Мониторинг рисков
+
+- observability stack  
+- runtime security detection  
+- централизованный анализ результатов сканирования
+
+
+## Международные фреймворки
+
+Помимо нормативных требований используются международные отраслевые фреймворки безопасности разработки.
+
+Эти модели **не являются нормативными требованиями**.  
+Они носят **рекомендательный характер** и используются для:
+
+- оценки зрелости процессов безопасности
+- построения roadmap улучшений DevSecOps
+- сопоставления практик с отраслевыми стандартами
+
+Фреймворки помогают структурировать процессы Secure SDLC и сопоставить архитектуру проекта с практиками ведущих технологических компаний.
+
+
+### OWASP SAMM / BSIMM
+
+Фреймворки применяются для оценки зрелости DevSecOps-процессов и анализа практик безопасности разработки.
+
+#### OWASP SAMM
+
+OWASP SAMM используется как модель зрелости Secure SDLC.
+
+Фреймворк разделяет практики безопасности на 5 доменов:
+
+- Governance  
+- Design  
+- Implementation  
+- Verification  
+- Operations
+
+**Оценка зрелости проекта**
+
+| SAMM Domain | Реализованные практики | Уровень |
+|---|---|---|
+| Governance | security policies, DevSecOps процессы, vulnerability management | Level 2 |
+| Design | threat modeling (STRIDE), secure architecture | Level 2 |
+| Implementation | SAST, SCA, dependency management | Level 3 |
+| Verification | DAST, fuzzing, security testing | Level 3 |
+| Operations | runtime security, observability, incident monitoring | Level 2 |
+
+**Итоговая зрелость**
+
+Платформа соответствует примерно **SAMM Level 2–3** (Managed / Defined).
+
+Это означает:
+
+- системные DevSecOps процессы
+- автоматизированные security-контроли
+- управляемый жизненный цикл уязвимостей
+
+
+#### BSIMM
+
+BSIMM используется для сопоставления реализованных практик с индустриальными моделями безопасности разработки.
+
+Фреймворк анализирует реальные практики безопасности крупных технологических компаний.
+
+**Соответствие практикам BSIMM**
+
+Проект демонстрирует практики из следующих доменов BSIMM:
+
+- Strategy & Metrics  
+- Attack Models  
+- Architectural Analysis  
+- Code Review  
+- Security Testing  
+- Penetration Testing  
+- Software Environment  
+- Configuration Management & Vulnerability Management
+
+**Тип компаний**
+
+Подобный уровень практик характерен для компаний с развитой DevSecOps-культурой:
+
+- cloud-native компании  
+- fintech и high-tech организации  
+- SaaS-платформы
+
+Примеры компаний из BSIMM, где применяются аналогичные практики:
+
+- Microsoft  
+- Salesforce  
+- Adobe  
+- PayPal  
+- VMware
+
+
+### NIST SSDF / CSF
+
+Фреймворки NIST используются как практическое руководство для внедрения безопасной разработки.
+
+#### NIST SSDF (Secure Software Development Framework)
+
+SSDF определяет практики Secure SDLC.
+
+Фреймворк разделён на четыре ключевых области:
+
+- Prepare the Organization (PO)  
+- Protect the Software (PS)  
+- Produce Well-Secured Software (PW)  
+- Respond to Vulnerabilities (RV)
+
+**Реализованные практики**
+
+Prepare the Organization
+
+- DevSecOps процессы  
+- централизованная security-платформа
+
+Protect the Software
+
+- artifact signing (Cosign)  
+- SBOM generation  
+- supply chain security
+
+Produce Well-Secured Software
+
+- SAST / SCA  
+- dependency scanning  
+- CI security gates
+
+Respond to Vulnerabilities
+
+- DefectDojo ASOC  
+- vulnerability triage workflow  
+- risk acceptance process
+
+
+#### NIST CSF (Cybersecurity Framework)
+
+CSF используется как высокоуровневая модель управления кибербезопасностью.
+
+Фреймворк включает пять основных функций:
+
+- Identify  
+- Protect  
+- Detect  
+- Respond  
+- Recover
+
+**Соответствие проекта**
+
+Identify
+
+- threat modeling  
+- SBOM inventory  
+- dependency tracking
+
+Protect
+
+- IAM (Keycloak)  
+- Vault secrets management  
+- Kubernetes security policies
+
+Detect
+
+- runtime detection (Falco)  
+- observability stack  
+- vulnerability scanning
+
+Respond
+
+- vulnerability management workflow  
+- DefectDojo triage
+
+Recover
+
+- GitOps deployment  
+- reproducible infrastructure (IaC)
+
+Таким образом DevSecOps-платформа демонстрирует практическое применение рекомендаций NIST для безопасной разработки и эксплуатации программных систем.

@@ -1,0 +1,31 @@
+host: defectdojo.dev.local
+
+createSecret: true
+
+admin:
+  username: admin
+  password: admin123
+
+database:
+  external:
+    enabled: false
+
+redis:
+  enabled: true
+
+celery:
+  worker:
+    replicas: 1
+
+uwsgi:
+  replicas: 1
+
+persistence:
+  enabled: false
+
+ingress:
+  enabled: false
+
+service:
+  type: ClusterIP
+  port: 8080

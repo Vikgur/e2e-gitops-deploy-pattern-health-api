@@ -1,0 +1,465 @@
+name: backend-ci
+
+on:
+  push:
+    paths:
+      - "app/backend/**"
+      - "tests/api/**"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "app/backend/**"
+      - "tests/api/**"
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+  security-events: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}/backend
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+
+  backend-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: checkout
+        uses: actions/checkout@v4
+
+      - name: setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: install deps
+        run: |
+          pip install -r app/backend/requirements.txt
+          pip install flake8 black isort mypy
+
+      - name: flake8
+        run: flake8 app/backend
+
+      - name: black
+        run: black --check app/backend
+
+      - name: isort
+        run: isort --check-only app/backend
+
+      - name: mypy
+        run: mypy app/backend
+
+
+  api-tests-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install -r tests/api/requirements.txt
+          pip install flake8 black mypy
+
+      - name: Flake8 (API tests)
+        run: flake8 tests/api/ --max-line-length=88 --extend-ignore=E203,W503
+
+      - name: Black (API tests)
+        run: black --check tests/api/
+      
+      - name: isort
+        run: isort --check-only tests/api/
+
+      - name: Mypy (API tests)
+        run: mypy tests/api/
+
+
+  backend-unit-tests:
+    runs-on: ubuntu-latest
+
+    needs:
+      - backend-lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: install deps
+        run: |
+          pip install -r app/backend/requirements.txt
+          pip install pytest
+
+      - name: run unit tests
+        run: |
+          pytest app/backend/tests
+
+
+  backend-secrets:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: app/backend/security-configs/gitleaks.toml
+
+
+  backend-sast:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: |
+            p/python
+            app/backend/security-configs/semgrep
+    
+      - name: sonarqube
+        uses: sonarsource/sonarqube-scan-action@v3
+        env:
+            SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+            projectKey: ${{ github.repository }}-backend
+            projectName: ${{ github.repository }} Backend
+            sources: app/backend
+            hostUrl: ${{ secrets.SONAR_HOST_URL }}
+
+
+  backend-dependency-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: dependency-check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: backend
+          path: app/backend
+          format: "HTML"
+          args: >
+            --scan app/backend
+            --out reports
+            --nvdApiKey ${{ secrets.NVD_API_KEY }}
+
+  backend-sbom-grype:
+    runs-on: ubuntu-latest
+    needs: backend-dependency-security
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syft generate SBOM (code)
+        uses: anchore/sbom-action@v0
+        with:
+          path: app/backend
+          output-file: code-sbom.spdx.json
+
+      - name: Grype scan SBOM (code)
+        uses: anchore/grype-action@v1
+        with:
+          input: code-sbom.spdx.json
+          output: grype-code-results.json
+          format: json
+
+      - name: Upload SBOM and Grype results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-artifacts
+          path: |
+            code-sbom.spdx.json
+            grype-code-results.json
+          retention-days: 7
+
+
+  backend-repo-security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: trivy fs
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: app/backend
+
+
+  backend-dockerfile-security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: app/backend/Dockerfile
+
+
+  tests-api-security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: tests/api/security-configs/gitleaks.toml
+
+      - name: semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: |
+            p/python
+            tests/api/security-configs/semgrep
+
+      - name: install python deps
+        run: |
+          pip install -r tests/api/requirements.txt
+
+      - name: dependency-check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: tests-api
+          path: tests/api
+          format: "HTML"
+
+      - name: syft generate sbom tests
+        uses: anchore/sbom-action@v0
+        with:
+          path: tests/api
+          output-file: tests-api-sbom.spdx.json
+
+
+  backend-build:
+    runs-on: ubuntu-latest
+
+    needs:
+      - backend-lint
+      - backend-secrets
+      - backend-sast
+      - backend-dependency-security
+      - backend-sbom-grype
+      - backend-repo-security
+      - backend-dockerfile-security
+      - tests-api-security
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: build docker image
+        run: |
+          docker build \
+            -t $IMAGE_NAME:$IMAGE_TAG \
+            -f app/backend/Dockerfile \
+            .
+
+
+  backend-api-tests-and-dast:
+    runs-on: ubuntu-latest
+
+    needs:
+      - backend-build
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if backend container is running
+        id: check-container
+        run: |
+          if [ "$(docker ps -q -f name=backend-test)" ]; then
+            echo "container=running" >> $GITHUB_OUTPUT
+          else
+            echo "container=not_running" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Start backend container (if not running)
+        if: steps.check-container.outputs.container == 'not_running'
+        run: |
+          docker run -d -p 8080:8080 \
+            --name backend-test \
+            $IMAGE_NAME:$IMAGE_TAG
+
+      - name: Wait for service to be ready
+        run: sleep 15
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install test dependencies
+        run: |
+          pip install -r tests/api/requirements.txt
+          pip install pytest requests
+
+      - name: Run API tests
+        run: |
+          pytest tests/api
+
+      - name: ZAP baseline scan (DAST)
+        uses: zaproxy/action-baseline@v0.11.0
+        with:
+          target: "http://localhost:8080"
+
+      - name: Stop container
+        if: always()
+        run: docker stop backend-test || echo "Container already stopped"
+
+
+  backend-url-fuzzing:
+    runs-on: ubuntu-latest
+
+    needs:
+      - backend-api-tests-and-dast
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: start backend container
+        run: |
+          docker run -d -p 8080:8080 \
+            --name backend-test \
+            $IMAGE_NAME:$IMAGE_TAG
+
+      - name: install ffuf
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffuf
+
+      - name: url fuzzing
+        run: |
+          ffuf \
+            -u http://localhost:8080/FUZZ \
+            -w tests/api/security-configs/wordlists/api-endpoints.txt \
+            -mc all
+
+      - name: stop container
+        run: docker stop backend-test
+
+
+  backend-image-security:
+    runs-on: ubuntu-latest
+
+    needs: backend-url-fuzzing
+
+    steps:
+      - name: trivy image scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
+
+  backend-image-sbom-grype:
+    runs-on: ubuntu-latest
+    needs: backend-build
+
+    steps:
+      - name: Syft generate SBOM image
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          output-file: backend-image-sbom.spdx.json
+
+      - name: Grype scan SBOM
+        uses: anchore/grype-action@v1
+        with:
+          input: backend-image-sbom.spdx.json
+          output: grype-results.json
+          format: json
+
+      - name: Upload Grype results as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: grype-scan-results
+          path: grype-results.json
+          retention-days: 7
+
+
+  backend-image-license-scan:
+    runs-on: ubuntu-latest
+
+    needs: backend-image-sbom-grype
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: scancode licenses
+        run: |
+          pip install scancode-toolkit
+          scancode \
+            --license \
+            --json licenses.json \
+            app/backend
+
+
+  backend-tag-image:
+    runs-on: ubuntu-latest
+
+    needs:
+      - backend-image-security
+      - backend-image-license-scan
+      - backend-image-sbom-grype
+
+    steps:
+      - name: Set image tag
+        run: |
+          echo "IMAGE_TAG=sha-${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Tag image
+        run: |
+          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:sha-${GITHUB_SHA::7}
+
+
+  backend-sign-image:
+    runs-on: ubuntu-latest
+
+    needs:
+      - backend-image-security
+      - backend-image-license-scan
+
+    steps:
+      - name: cosign install
+        uses: sigstore/cosign-installer@v3
+
+      - name: cosign sign
+        run: |
+          cosign sign --yes $IMAGE_NAME:$IMAGE_TAG
+
+
+  backend-push-image:
+    runs-on: ubuntu-latest
+
+    needs:
+      - backend-api-tests-and-dast
+      - backend-sign-image
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: login ghcr
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: push image
+        run: |
+          docker push $IMAGE_NAME:$IMAGE_TAG

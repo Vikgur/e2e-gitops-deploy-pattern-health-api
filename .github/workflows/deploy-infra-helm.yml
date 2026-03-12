@@ -1,0 +1,29 @@
+name: deploy-infra-helm
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-gitops:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+        with:
+          repository: your-org/gitops-apps-health-api
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Update Helm values
+        run: |
+          sed -i "s/version:.*/version: ${GITHUB_SHA}/" apps/platform/values.yaml
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: infra-release-${{ github.run_number }}
+          title: update platform manifests

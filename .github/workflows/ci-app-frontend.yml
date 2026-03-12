@@ -1,0 +1,297 @@
+name: frontend-ci
+
+on:
+  push:
+    paths:
+      - "app/frontend/**"
+      - ".github/workflows/frontend-ci.yml"
+  pull_request:
+    paths:
+      - "app/frontend/**"
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+  security-events: write
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}/frontend
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+
+  frontend-lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: install deps
+        run: |
+          cd app/frontend
+          npm install
+
+      - name: eslint
+        run: |
+          cd app/frontend
+          npx eslint .
+
+      - name: prettier
+        run: |
+          cd app/frontend
+          npx prettier --check .
+
+
+  frontend-unit-tests:
+    runs-on: ubuntu-latest
+    needs: frontend-lint
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: install deps
+        run: |
+          cd app/frontend
+          npm install
+
+      - name: run unit tests
+        run: |
+          cd app/frontend/tests
+          npm test -- --watchAll=false
+
+
+  frontend-secrets:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          config-path: app/frontend/security-configs/gitleaks.toml
+
+
+  frontend-sast:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: semgrep
+        uses: returntocorp/semgrep-action@v1
+        with:
+          config: |
+            p/javascript
+            app/frontend/security-configs/semgrep
+
+
+  frontend-dependency-security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: dependency-check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          project: frontend
+          path: app/frontend
+          format: "HTML"
+
+
+  frontend-sbom-grype:
+    runs-on: ubuntu-latest
+    needs: frontend-dependency-security
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syft generate SBOM (frontend code)
+        uses: anchore/sbom-action@v0
+        with:
+          path: app/frontend
+          output-file: frontend-code-sbom.spdx.json
+
+
+      - name: Grype scan SBOM (frontend code)
+        uses: anchore/grype-action@v1
+        with:
+          input: frontend-code-sbom.spdx.json
+          output: grype-frontend-results.json
+          format: json
+
+      - name: Upload SBOM and Grype results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-security-artifacts
+          path: |
+            frontend-code-sbom.spdx.json
+            grype-frontend-results.json
+          retention-days: 7
+
+
+  frontend-repo-security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: trivy fs
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: app/frontend
+
+
+  frontend-dockerfile-security:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: app/frontend/Dockerfile
+
+
+  frontend-build:
+    runs-on: ubuntu-latest
+
+    needs:
+      - frontend-unit-tests
+      - frontend-secrets
+      - frontend-sast
+      - frontend-dependency-security
+      - frontend-repo-security
+      - frontend-dockerfile-security
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: build frontend
+        run: |
+          cd app/frontend
+          npm install
+          npm run build
+
+      - name: build docker image
+        run: |
+          docker build \
+            -t $IMAGE_NAME:$IMAGE_TAG \
+            -f app/frontend/Dockerfile \
+            .
+
+
+  frontend-image-security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trivy image scan
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+
+
+  frontend-image-sbom-grype:
+    runs-on: ubuntu-latest
+    needs: frontend-image-security
+    steps:
+      - name: Generate SBOM for image
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          output-file: frontend-image-sbom.spdx.json
+
+      - name: Grype scan SBOM (image)
+        uses: anchore/grype-action@v1
+        with:
+          input: frontend-image-sbom.spdx.json
+          output: grype-frontend-image-results.json
+          format: json
+
+      - name: Upload SBOM and Grype results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-image-security-artifacts
+          path: |
+            frontend-image-sbom.spdx.json
+            grype-frontend-image-results.json
+          retention-days: 7
+
+
+  frontend-image-license-scan:
+    runs-on: ubuntu-latest
+    needs: frontend-image-sbom-grype
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: scancode
+        run: |
+          pip install scancode-toolkit
+          scancode \
+            --license \
+            --json licenses.json \
+            app/frontend
+
+
+  frontend-tag-image:
+    runs-on: ubuntu-latest
+
+    needs:
+      - frontend-image-security
+      - frontend-image-license-scan
+      - frontend-image-sbom-grype
+
+    steps:
+      - name: Set image tag
+        run: |
+          echo "IMAGE_TAG=sha-${GITHUB_SHA::7}" >> $GITHUB_ENV
+
+      - name: Tag image
+        run: |
+          docker tag $IMAGE_NAME:$IMAGE_TAG $IMAGE_NAME:sha-${GITHUB_SHA::7}
+
+
+  frontend-sign-image:
+    runs-on: ubuntu-latest
+
+    needs:
+      - frontend-image-license-scan
+
+    steps:
+      - name: cosign install
+        uses: sigstore/cosign-installer@v3
+
+      - name: cosign sign
+        run: |
+          cosign sign --yes $IMAGE_NAME:$IMAGE_TAG
+
+
+  frontend-push-image:
+    runs-on: ubuntu-latest
+
+    needs:
+      - frontend-sign-image
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: login ghcr
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: push image
+        run: |
+          docker push $IMAGE_NAME:$IMAGE_TAG

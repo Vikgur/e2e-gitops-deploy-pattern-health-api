@@ -1,0 +1,138 @@
+name: infra-terraform-ci
+
+on:
+  push:
+    paths:
+      - "terraform/**"
+      - ".github/workflows/ci-infra-terraform-ci.yml"
+  pull_request:
+    paths:
+      - "terraform/**"
+
+permissions:
+  contents: read
+  id-token: write
+  packages: write
+  security-events: write
+
+jobs:
+
+  terraform-quality:
+    name: Code Quality (Fmt + Validate + TFLint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Terraform
+        run: |
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+          sudo apt-add-repository "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+          sudo apt-get update && sudo apt-get install -y terraform
+          curl -sL https://raw.githubusercontent.com/terraform-linters/tflint/master/install_linux.sh | bash
+
+      - name: Terraform fmt
+        run: terraform fmt -check=true -recursive terraform/
+
+      - name: Terraform validate
+        run: terraform validate terraform/
+
+      - name: Run TFLint
+        run: tflint terraform/
+
+  gitleaks-secrets:
+    name: Secrets Check (Gitleaks)
+    runs-on: ubuntu-latest
+    needs: terraform-quality
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Gitleaks
+        run: curl -sSfL https://raw.githubusercontent.com/zricethezav/gitleaks/main/install.sh | bash
+
+      - name: Run Gitleaks
+        run: gitleaks detect --source=terraform/ --verbose
+
+  trivy-fs:
+    name: Repo Security (Trivy FS)
+    runs-on: ubuntu-latest
+    needs: gitleaks-secrets
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Trivy
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget
+          wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.46.0_Linux-64bit.deb
+          sudo dpkg -i trivy_0.46.0_Linux-64bit.deb
+
+      - name: Run Trivy FS scan
+        run: trivy fs terraform/
+
+  checkov-iac:
+    name: IaC Security (Checkov)
+    runs-on: ubuntu-latest
+    needs: trivy-fs
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Checkov
+        run: pip install checkov
+
+      - name: Run Checkov
+        run: checkov -d terraform/ --framework terraform
+
+  opa-conftest:
+    name: Policy-as-Code (OPA / Conftest / Rego)
+    runs-on: ubuntu-latest
+    needs: checkov-iac
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Conftest
+        run: |
+          wget https://github.com/open-policy-agent/conftest/releases/latest/download/conftest_1.11.0_Linux_x86_64.tar.gz
+          tar xzf conftest_1.11.0_Linux_x86_64.tar.gz
+          sudo mv conftest /usr/local/bin/
+
+      - name: Run Conftest
+        run: conftest test terraform/
+
+  syft-sbom:
+    name: SBOM generation (Syft)
+    runs-on: ubuntu-latest
+    needs: opa-conftest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Syft
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh
+
+      - name: Generate SBOM
+        run: syft terraform/ -o json > sbom.json
+
+  grype-sbom-analysis:
+    name: SBOM analysis (Grype)
+    runs-on: ubuntu-latest
+    needs: syft-sbom
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install Grype
+        run: curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh
+
+      - name: Analyze SBOM
+        run: grype sbom:sbom.json
+
+  scancode-licenses:
+    name: Licenses Check (ScanCode Toolkit)
+    runs-on: ubuntu-latest
+    needs: grype-sbom-analysis
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Install ScanCode
+        run: pip install scancode-toolkit
+
+      - name: Run ScanCode
+        run: scancode --json scancode-result.json terraform/

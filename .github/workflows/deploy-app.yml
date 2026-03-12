@@ -1,0 +1,54 @@
+name: deploy-app
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
+env:
+  IMAGE_TAG: sha-${{ github.sha }}
+
+jobs:
+  verify-images:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3
+
+      - name: Verify backend image
+        run: |
+          cosign verify ghcr.io/${{ github.repository }}/backend:${IMAGE_TAG} \
+          --certificate-identity-regexp "https://github.com/${{ github.repository }}" \
+          --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+      - name: Verify frontend image
+        run: |
+          cosign verify ghcr.io/${{ github.repository }}/frontend:${IMAGE_TAG} \
+          --certificate-identity-regexp "https://github.com/${{ github.repository }}" \
+          --certificate-oidc-issuer https://token.actions.githubusercontent.com
+
+  update-gitops:
+    needs: verify-images
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout GitOps repo
+        uses: actions/checkout@v4
+        with:
+          repository: your-org/gitops-apps-health-api
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Update image tag
+        run: |
+          sed -i "s/tag:.*/tag: ${IMAGE_TAG}/" apps/backend/values.yaml
+          sed -i "s/tag:.*/tag: ${IMAGE_TAG}/" apps/frontend/values.yaml
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: release-${{ github.run_number }}
+          title: release images ${{ env.IMAGE_TAG }}
