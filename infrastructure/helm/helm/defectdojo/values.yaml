@@ -1,0 +1,50 @@
+host: defectdojo.security.local
+
+createSecret: false
+
+django:
+  secretKeySecret: defectdojo-bootstrap
+  secretKeyKey: DD_SECRET_KEY
+
+admin:
+  existingSecret: defectdojo-bootstrap
+  usernameKey: DD_ADMIN_USER
+  passwordKey: DD_ADMIN_PASSWORD
+
+database:
+  external:
+    enabled: true
+    existingSecret: defectdojo-bootstrap
+    secretKey: DD_DATABASE_URL
+
+redis:
+  enabled: true
+
+celery:
+  worker:
+    replicas: 2
+
+uwsgi:
+  replicas: 2
+
+persistence:
+  enabled: true
+  existingClaim: defectdojo-media
+
+ingress:
+  enabled: false
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1
+    memory: 1Gi
+
+metrics:
+  enabled: true

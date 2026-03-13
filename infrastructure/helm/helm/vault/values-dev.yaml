@@ -1,0 +1,12 @@
+server:
+  ha:
+    enabled: false
+
+  dataStorage:
+    enabled: false
+
+  auditStorage:
+    enabled: false
+
+ui:
+  enabled: true

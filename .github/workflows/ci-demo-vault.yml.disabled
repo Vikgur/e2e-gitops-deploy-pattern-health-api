@@ -1,0 +1,46 @@
+name: CI Demo Vault
+
+on:
+  workflow_dispatch:
+
+jobs:
+  demo-vault:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Установка зависимостей
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip jq curl
+
+      - name: Установка Vault CLI
+        run: |
+          VAULT_VERSION="1.14.3"
+          curl -fsSL https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip -o vault.zip
+          unzip vault.zip
+          sudo mv vault /usr/local/bin/
+          vault --version
+
+      - name: Запуск dev Vault
+        run: |
+          nohup vault server -dev -dev-root-token-id=root -dev-listen-address="127.0.0.1:8200" &> vault.log &
+          sleep 5
+          export VAULT_ADDR="http://127.0.0.1:8200"
+          vault kv put secret/data/apps/database db_user=demo db_password=demo123
+
+      - name: Настройка AppRole
+        run: |
+          export VAULT_ADDR="http://127.0.0.1:8200"
+          vault auth enable approle || true
+          vault write auth/approle/role/backend-role token_policies="default" secret_id_ttl=10m
+          ROLE_ID=$(vault read -field=role_id auth/approle/role/backend-role/role-id)
+          SECRET_ID=$(vault write -field=secret_id -f auth/approle/role/backend-role/secret-id)
+          echo "APPROLE_ROLE_ID=${ROLE_ID}" >> $GITHUB_ENV
+          echo "APPROLE_SECRET_ID=${SECRET_ID}" >> $GITHUB_ENV
+
+      - name: Запуск demo-скрипта
+        run: |
+          chmod +x scripts/ci/demo-vault-login.sh
+          ./scripts/ci/demo-vault-login.sh

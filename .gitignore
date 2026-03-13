@@ -59,3 +59,4 @@ terraform/**/terraform.tfstate.*
 terraform/**/crash.log
 terraform/**/terraform.tfvars
 
+bootstrap.sh
